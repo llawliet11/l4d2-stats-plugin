@@ -184,6 +184,7 @@ CREATE TABLE `stats_users` (
   `kills_molotov` int(10) unsigned NOT NULL DEFAULT 0,
   `kills_pipe` int(10) unsigned NOT NULL DEFAULT 0,
   `kills_minigun` int(10) unsigned NOT NULL DEFAULT 0,
+  `kills_all_specials` int(10) unsigned NOT NULL DEFAULT 0,
   `caralarms_activated` smallint(5) unsigned NOT NULL DEFAULT 0,
   `witches_crowned` int(10) unsigned NOT NULL DEFAULT 0,
   `witches_crowned_angry` smallint(5) unsigned NOT NULL DEFAULT 0,
