@@ -52,3 +52,6 @@ server {
     }
 }
 ```
+
+### Credits
+* [Jackzmc](https://github.com/Jackzmc) - Plugin and API
