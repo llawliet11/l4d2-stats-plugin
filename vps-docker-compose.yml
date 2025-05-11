@@ -1,0 +1,60 @@
+version: '3'
+networks:
+  l4d2stats-network:
+    driver: bridge
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: l4d2stats-db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=your_secure_root_password
+      - MYSQL_DATABASE=left4dead2
+      - MYSQL_USER=your_database_user
+      - MYSQL_PASSWORD=your_database_password
+    networks:
+      - l4d2stats-network
+    restart: unless-stopped
+  l4d2stats-api:
+    build:
+      context: ./website-api
+      dockerfile: Dockerfile
+    container_name: l4d2stats-api
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./website-api:/backend
+    environment:
+      - NODE_ENV=production
+      - MYSQL_HOST=mysql
+      - MYSQL_DB=left4dead2
+      - MYSQL_USER=your_database_user
+      - MYSQL_PASSWORD=your_database_password
+      - WEB_PORT=8081
+      - CORS_WHITELIST=http://l4d.test.com,https://l4d.test.com
+    networks:
+      - l4d2stats-network
+    depends_on:
+      - mysql
+    restart: unless-stopped
+  l4d2stats-ui:
+    build:
+      context: ./website-ui
+      dockerfile: Dockerfile
+    container_name: l4d2stats-ui
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - l4d2stats-network
+    depends_on:
+      - l4d2stats-api
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
