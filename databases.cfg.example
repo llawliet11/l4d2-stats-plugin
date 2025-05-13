@@ -1,0 +1,16 @@
+"Databases"
+{
+    "driver_default"        "mysql"
+
+    "stats"
+    {
+        "driver"            "mysql"
+        "host"              "YOUR_IP"
+        "database"          "YOUR_MYSQL_DATABASE"
+        "user"              "YOUR_MYSQL_DATABASE_USER"
+        "pass"              "YOUR_MYSQL_DATABASE_PASSWORD"
+        "port"              "YOUR_MYSQL_DATABASE_PORT"
+        "timeout"           "10"
+        "charset"           "utf8mb4"
+    }
+}
