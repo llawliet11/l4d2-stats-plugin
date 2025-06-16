@@ -1,58 +1,143 @@
-version: '3'
 networks:
   l4d2stats-network:
     driver: bridge
 
 services:
-  mysql:
-    image: mysql:8.4
+  mariadb:
+    image: mariadb:latest
     container_name: l4d2stats-db
-    ports:
-      - "3306:3306"
+    # ports:
+    #   - "33306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./stats_database.sql:/docker-entrypoint-initdb.d/stats_database.sql
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
-      - MYSQL_DATABASE=dbname
-      - MYSQL_USER=dbuser
-      - MYSQL_PASSWORD=dbpass
+      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+      - MARIADB_DATABASE=${MARIADB_DATABASE}
+      - MARIADB_USER=${MARIADB_USER}
+      - MARIADB_PASSWORD=${MARIADB_PASSWORD}
     networks:
       - l4d2stats-network
     restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
   l4d2stats-api:
-    build:
-      context: ./website-api
-      dockerfile: Dockerfile
+    image: node:18
     container_name: l4d2stats-api
-    ports:
-      - "8081:8081"
+    # ports:
+    #   - "${API_PORT}:${API_PORT}"
     volumes:
       - ./website-api:/backend
     environment:
       - NODE_ENV=production
-      - MYSQL_HOST=mysql
-      - MYSQL_DB=dbname
-      - MYSQL_USER=dbuser
-      - MYSQL_PASSWORD=dbpass
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_DB=${MYSQL_DB}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - WEB_PORT=${API_PORT}
+    command: >
+      sh -c "apt-get update &&
+             apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev &&
+             cd /backend &&
+             corepack enable &&
+             yarn install &&
+             yarn run start"
     networks:
       - l4d2stats-network
     depends_on:
-      - mysql
+      - mariadb
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
   l4d2stats-ui:
-    build:
-      context: ./website-ui
-      dockerfile: Dockerfile
+    image: node:18
     container_name: l4d2stats-ui
-    ports:
-      - "8080:8080"
-    environment:
-      - NODE_ENV=production
+    volumes:
+      - ./website-ui:/frontend
+      - ./build-once.sh:/build-once.sh    
+    command: sh -c "/build-once.sh"
     networks:
       - l4d2stats-network
     depends_on:
       - l4d2stats-api
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  l4d2stats-nginx:
+    image: nginx:alpine
+    container_name: l4d2stats-nginx
+    # ports:
+    #   - "${UI_PORT}:80"
+    volumes:
+      - ./website-ui/dist:/usr/share/nginx/html
+      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template
+    environment:
+      - API_PORT=${API_PORT}
+      - NGINX_ENVSUBST_TEMPLATE_DIR=/etc/nginx/templates
+      - NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d
+    networks:
+      - l4d2stats-network
+    depends_on:
+      - l4d2stats-ui
+      - l4d2stats-api
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: l4d2stats-phpmyadmin
+    # ports:
+    #   - "8082:80"
+    environment:
+      - PMA_HOST=${MYSQL_HOST}
+      - PMA_PORT=${MYSQL_PORT}
+      - MYSQL_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+      - PMA_USER=${MARIADB_USER}
+      - PMA_PASSWORD=${MARIADB_PASSWORD}
+      - PMA_ARBITRARY=1
+    networks:
+      - l4d2stats-network
+    depends_on:
+      - mariadb
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
 volumes:
   mysql-data:

@@ -26,13 +26,16 @@ import RouteMisc from './routes/misc.js'
 (async function() {
     const details = {
         socketPath: process.env.MYSQL_SOCKET_PATH,
-        host:     process.env.MYSQL_HOST   || 'localhost', 
+        host:     process.env.MYSQL_HOST   || 'localhost',
+        port:     process.env.MYSQL_PORT   || 3306,
         database: process.env.MYSQL_DB     || 'left4dead2',
-        user:     process.env.MYSQL_USER   || 'root', 
+        user:     process.env.MYSQL_USER   || 'root',
         password: process.env.MYSQL_PASSWORD
     }
+    console.log("details", details);
+
     const pool = mysql.createPool(details);
-    console.log('Connecting to', (details.socketPath || details.host), 'database', details.database)
+    console.log('Connecting to', (details.socketPath || `${details.host}:${details.port}`), 'database', details.database)
 
     app.use((req, res, next) => {
         if(!req.headers.origin || whitelist.includes(req.headers.origin)) {
@@ -47,7 +50,7 @@ import RouteMisc from './routes/misc.js'
     app.use('/api/maps',     RouteMaps(pool))
     app.use('/api/top',         RouteTop(pool))
     app.use('/api/',            RouteMisc(pool))
-    
+
     app.get('*',(req,res) => {
         res.status(404).json({error:'PageNotFound'})
     })
