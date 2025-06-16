@@ -11,10 +11,8 @@ export default function(pool) {
             const pageNumber = (isNaN(selectedPage) || selectedPage <= 0) ? 0 : (parseInt(req.params.page) - 1);
             const offset = pageNumber * MAX_RESULTS;
             let rows, version
-            if(req.query.version == "1") {
-                [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` ORDER BY `points` DESC, `minutes_played` DESC LIMIT ?,?", [offset, MAX_RESULTS])
-                version = "v1"
-            } else {
+            if(req.query.version == "2") {
+                // Legacy v2 calculated points (kept for compatibility)
                 [rows] = await pool.query(`select
                      steamid,last_alias,minutes_played,last_join_date,
                     points as points_old,
@@ -39,6 +37,10 @@ export default function(pool) {
                     [offset, MAX_RESULTS]
                 )
                 version = "v2"
+            } else {
+                // Default: Use corrected database points (v1)
+                [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` ORDER BY `points` DESC, `minutes_played` DESC LIMIT ?,?", [offset, MAX_RESULTS])
+                version = "v1"
             }
             res.json({
                 users: rows,
