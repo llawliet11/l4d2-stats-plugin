@@ -20,23 +20,7 @@ export default function(pool) {
             //TODO: add top_gamemode
             if(!req.params.user) return res.status(404).json([])
             const searchQuery = `%${req.params.user}%`;
-            const [rows] = await pool.query(`SELECT steamid,last_alias,minutes_played,last_join_date,
-                points as points_old,
-                (
-                    (common_kills / 1000 * 0.10) +
-                    (kills_all_specials * 0.25) +
-                    (revived_others * 0.05) +
-                    (heal_others * 0.05) -
-                    (survivor_incaps * 0.10) -
-                    (survivor_deaths * 0.05) -
-                    (survivor_ff / 1000 * 0.03) +
-                    (CASE WHEN minutes_played > 0 THEN damage_to_tank * 0.15 / minutes_played ELSE 0 END) +
-                    ((kills_molotov + kills_pipe) * 0.025) +
-                    (witches_crowned * 0.2) -
-                    (rocks_hitby * 0.2) +
-                    (cleared_pinned * 0.05)
-                ) as points
-                FROM \`stats_users\` WHERE \`last_alias\` LIKE ? LIMIT 20`, [ searchQuery ])
+            const [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` WHERE `last_alias` LIKE ? LIMIT 20", [ searchQuery ])
             res.json(rows);
         }catch(err) {
             console.error('[/api/search/:user]', err.message);
@@ -147,5 +131,42 @@ export default function(pool) {
             res.status(500).json({error:'Internal Server Error'})
         }
     })
+
+    // New endpoint for database health check
+    router.get('/health', routeCache.cacheSeconds(60), async(req,res) => {
+        try {
+            const [userStats] = await pool.execute(`
+                SELECT
+                    COUNT(*) as total_users,
+                    COUNT(CASE WHEN minutes_played > 0 THEN 1 END) as active_users,
+                    AVG(CASE WHEN minutes_played > 0 THEN minutes_played END) as avg_playtime,
+                    MAX(last_join_date) as last_activity
+                FROM stats_users
+            `);
+
+            const [sessionStats] = await pool.execute(`
+                SELECT
+                    COUNT(*) as total_sessions,
+                    COUNT(CASE WHEN date_end > 0 AND date_start > 0 THEN 1 END) as valid_sessions,
+                    AVG(CASE WHEN date_end > 0 AND date_start > 0 THEN (date_end - date_start) / 60 END) as avg_session_minutes
+                FROM stats_games
+            `);
+
+            res.json({
+                status: 'healthy',
+                users: userStats[0],
+                sessions: sessionStats[0],
+                timestamp: new Date().toISOString()
+            });
+        } catch(err) {
+            console.error('[/api/health]', err.message);
+            res.status(500).json({
+                status: 'unhealthy',
+                error: 'Database connection failed',
+                timestamp: new Date().toISOString()
+            });
+        }
+    })
+
     return router;
 }
