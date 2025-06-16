@@ -17,8 +17,29 @@ import { getMapName } from '../map.js'
 export default function(pool) {
     router.get('/random', routeCache.cacheSeconds(86400), async(req,res) => {
         try {
-            const [results] = await pool.execute("SELECT * FROM `stats_users` ORDER BY RAND() LIMIT 1")
-            return res.json({user: results[0]})
+            const [results] = await pool.execute(`SELECT *,
+                points as points_old,
+                (
+                    (common_kills / 1000 * 0.10) +
+                    (kills_all_specials * 0.25) +
+                    (revived_others * 0.05) +
+                    (heal_others * 0.05) -
+                    (survivor_incaps * 0.10) -
+                    (survivor_deaths * 0.05) -
+                    (survivor_ff / 1000 * 0.03) +
+                    (CASE WHEN minutes_played > 0 THEN damage_to_tank * 0.15 / minutes_played ELSE 0 END) +
+                    ((kills_molotov + kills_pipe) * 0.025) +
+                    (witches_crowned * 0.2) -
+                    (rocks_hitby * 0.2) +
+                    (cleared_pinned * 0.05)
+                ) as points_calculated
+                FROM \`stats_users\` ORDER BY RAND() LIMIT 1`)
+            if(results.length > 0) {
+                const userData = results[0];
+                userData.points = Math.round(userData.points_calculated * 100) / 100;
+                return res.json({user: userData})
+            }
+            return res.json({user: null})
         }catch(err) {
             res.status(500).json({error:"Internal Server Error"})
         }
@@ -30,17 +51,36 @@ export default function(pool) {
             let bits = req.params.user.split(":")
             bits = bits[bits.length - 1]
             const [rows] = await pool.query(
-                "SELECT * FROM `stats_users` WHERE STRCMP(`last_alias`,?) = 0 OR `steamid` LIKE CONCAT('STEAM_%:%:', ?)", 
+                `SELECT *,
+                points as points_old,
+                (
+                    (common_kills / 1000 * 0.10) +
+                    (kills_all_specials * 0.25) +
+                    (revived_others * 0.05) +
+                    (heal_others * 0.05) -
+                    (survivor_incaps * 0.10) -
+                    (survivor_deaths * 0.05) -
+                    (survivor_ff / 1000 * 0.03) +
+                    (CASE WHEN minutes_played > 0 THEN damage_to_tank * 0.15 / minutes_played ELSE 0 END) +
+                    ((kills_molotov + kills_pipe) * 0.025) +
+                    (witches_crowned * 0.2) -
+                    (rocks_hitby * 0.2) +
+                    (cleared_pinned * 0.05)
+                ) as points_calculated
+                FROM \`stats_users\` WHERE STRCMP(\`last_alias\`,?) = 0 OR \`steamid\` LIKE CONCAT('STEAM_%:%:', ?)`,
                 [user, bits]
             )
             if(rows.length > 0) {
+                const userData = rows[0];
+                // Use calculated points as the main points value
+                userData.points = Math.round(userData.points_calculated * 100) / 100;
                 res.json({
-                    user:rows[0],
+                    user: userData,
                 })
             }else{
-                res.json({ 
-                    user: null, 
-                    not_found: true 
+                res.json({
+                    user: null,
+                    not_found: true
                 })
             }
         }catch(err) {

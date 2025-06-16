@@ -371,7 +371,7 @@
                 <td>Friendly Fire</td>
                 <td class="tvalue">{{averages.survivor_ff | formatNumber}}</td>
                 <td class="tvalue">{{(averages.survivor_ff / averages.totalSessions).toFixed(2)}}</td>
-                <td class="tvalue">{{(averages.survivor_ff / averages.minutes_played).toFixed(5)}}</td>
+                <td class="tvalue">{{(averages.survivor_ff / hoursPlayed).toFixed(5)}}</td>
                 <td class="tvalue">{{(averages.survivor_ff / averages.globalTotalSessions).toFixed(2)}}</td>
             </tr>
             <tr>
@@ -399,7 +399,7 @@
                 <td>Minutes Spent Idle</td>
                 <td class="tvalue">{{averages.minutes_idle | formatNumber}}</td>
                 <td class="tvalue">{{(averages.minutes_idle / averages.totalSessions).toFixed(2)}}</td>
-                <td class="tvalue">{{(averages.minutes_idle / hoursPlayed).toFixed(5)}}</td>
+                <td class="tvalue">{{(averages.minutes_idle / hoursPlayed).toFixed(2)}}</td>
                 <td class="tvalue">{{(averages.minutes_idle / averages.globalTotalSessions).toFixed(2)}}</td>
             </tr>
             </tbody>

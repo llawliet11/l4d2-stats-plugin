@@ -20,7 +20,23 @@ export default function(pool) {
             //TODO: add top_gamemode
             if(!req.params.user) return res.status(404).json([])
             const searchQuery = `%${req.params.user}%`;
-            const [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` WHERE `last_alias` LIKE ? LIMIT 20", [ searchQuery ])
+            const [rows] = await pool.query(`SELECT steamid,last_alias,minutes_played,last_join_date,
+                points as points_old,
+                (
+                    (common_kills / 1000 * 0.10) +
+                    (kills_all_specials * 0.25) +
+                    (revived_others * 0.05) +
+                    (heal_others * 0.05) -
+                    (survivor_incaps * 0.10) -
+                    (survivor_deaths * 0.05) -
+                    (survivor_ff / 1000 * 0.03) +
+                    (CASE WHEN minutes_played > 0 THEN damage_to_tank * 0.15 / minutes_played ELSE 0 END) +
+                    ((kills_molotov + kills_pipe) * 0.025) +
+                    (witches_crowned * 0.2) -
+                    (rocks_hitby * 0.2) +
+                    (cleared_pinned * 0.05)
+                ) as points
+                FROM \`stats_users\` WHERE \`last_alias\` LIKE ? LIMIT 20`, [ searchQuery ])
             res.json(rows);
         }catch(err) {
             console.error('[/api/search/:user]', err.message);
@@ -30,34 +46,34 @@ export default function(pool) {
 
     router.get('/totals', routeCache.cacheSeconds(300), async(req,res) => {
         try {
-            const [totals] = await pool.execute(`SELECT 
-            sum(nullif(finale_time,0)) as finale_time, 
-            sum(date_end - date_start) as game_duration,
-            sum(nullif(ZombieKills,0)) as zombie_kills, 
-            sum(nullif(SurvivorDamage,0)) as survivor_ff, 
-            sum(MedkitsUsed) as MedkitsUsed, 
+            const [totals] = await pool.execute(`SELECT
+            sum(nullif(finale_time,0)) as finale_time,
+            sum(CASE WHEN date_end > 0 AND date_start > 0 THEN date_end - date_start ELSE 0 END) as game_duration,
+            sum(nullif(ZombieKills,0)) as zombie_kills,
+            sum(nullif(SurvivorDamage,0)) as survivor_ff,
+            sum(MedkitsUsed) as MedkitsUsed,
             sum(FirstAidShared) as FirstAidShared,
-            sum(PillsUsed) as PillsUsed, 
+            sum(PillsUsed) as PillsUsed,
             sum(AdrenalinesUsed) as AdrenalinesUsed,
-            sum(MolotovsUsed) as MolotovsUsed, 
-            sum(PipebombsUsed) as PipebombsUsed, 
-            sum(BoomerBilesUsed) as BoomerBilesUsed, 
-            sum(DamageTaken) as DamageTaken, 
-            sum(MeleeKills) as MeleeKills, 
-            sum(ReviveOtherCount) as ReviveOtherCount, 
+            sum(MolotovsUsed) as MolotovsUsed,
+            sum(PipebombsUsed) as PipebombsUsed,
+            sum(BoomerBilesUsed) as BoomerBilesUsed,
+            sum(DamageTaken) as DamageTaken,
+            sum(MeleeKills) as MeleeKills,
+            sum(ReviveOtherCount) as ReviveOtherCount,
             sum(DefibrillatorsUsed) as DefibrillatorsUsed,
-            sum(Deaths) as Deaths, 
-            sum(Incaps) as Incaps, 
-            sum(nullif(boomer_kills,0)) as boomer_kills, 
-            sum(nullif(jockey_kills,0)) as jockey_kills, 
-            sum(nullif(smoker_kills,0)) as smoker_kills, 
-            sum(nullif(spitter_kills,0)) as spitter_kills, 
+            sum(Deaths) as Deaths,
+            sum(Incaps) as Incaps,
+            sum(nullif(boomer_kills,0)) as boomer_kills,
+            sum(nullif(jockey_kills,0)) as jockey_kills,
+            sum(nullif(smoker_kills,0)) as smoker_kills,
+            sum(nullif(spitter_kills,0)) as spitter_kills,
             sum(nullif(hunter_kills,0)) as hunter_kills,
             sum(nullif(charger_kills,0)) as charger_kills,
             (SELECT COUNT(*) FROM \`stats_games\`) AS total_sessions,
             (SELECT COUNT(distinct(campaignID)) from stats_games) AS total_games,
             (SELECT COUNT(*) FROM \`stats_users\`) AS total_users
-            FROM stats_games WHERE date_start > 0`)
+            FROM stats_games WHERE date_start > 0 AND date_end > 0`)
             const [mapTotals] = await pool.execute("SELECT map,COUNT(*) as count FROM stats_games GROUP BY map ORDER BY COUNT(map) DESC")
             if(totals.length == 0) {
                 return res.status(500).json({error:'Internal Server Error'})
@@ -83,33 +99,33 @@ export default function(pool) {
         try {
             const [maps] = await pool.execute("SELECT map FROM stats_games WHERE map RLIKE \"^c[0-9]m\" GROUP BY map ORDER BY COUNT(map) DESC")
             const [userCount] = await pool.execute("SELECT AVG(games.players) as avgPlayers FROM (SELECT COUNT(campaignID) as players FROM stats_games GROUP BY `campaignID`) as games")
-            const [topStats] = await pool.execute(`SELECT 
-            avg(nullif(finale_time,0)) as finale_time, 
-            avg(date_end - date_start) as game_duration,
-            avg(nullif(ZombieKills,0)) as zombie_kills, 
-            avg(nullif(SurvivorDamage,0)) as survivor_ff, 
-            avg(MedkitsUsed) as MedkitsUsed, 
+            const [topStats] = await pool.execute(`SELECT
+            avg(nullif(finale_time,0)) as finale_time,
+            avg(CASE WHEN date_end > 0 AND date_start > 0 THEN date_end - date_start ELSE 0 END) as game_duration,
+            avg(nullif(ZombieKills,0)) as zombie_kills,
+            avg(nullif(SurvivorDamage,0)) as survivor_ff,
+            avg(MedkitsUsed) as MedkitsUsed,
             avg(FirstAidShared) as FirstAidShared,
-            avg(PillsUsed) as PillsUsed, 
+            avg(PillsUsed) as PillsUsed,
             avg(AdrenalinesUsed) as AdrenalinesUsed,
-            avg(MolotovsUsed) as MolotovsUsed, 
-            avg(PipebombsUsed) as PipebombsUsed, 
-            avg(BoomerBilesUsed) as BoomerBilesUsed, 
-            avg(DamageTaken) as DamageTaken, 
-            avg(difficulty) as difficulty, 
-            avg(MeleeKills) as MeleeKills, 
-            avg(ping) as ping, 
-            avg(ReviveOtherCount) as ReviveOtherCount, 
+            avg(MolotovsUsed) as MolotovsUsed,
+            avg(PipebombsUsed) as PipebombsUsed,
+            avg(BoomerBilesUsed) as BoomerBilesUsed,
+            avg(DamageTaken) as DamageTaken,
+            avg(difficulty) as difficulty,
+            avg(MeleeKills) as MeleeKills,
+            avg(ping) as ping,
+            avg(ReviveOtherCount) as ReviveOtherCount,
             avg(DefibrillatorsUsed) as DefibrillatorsUsed,
-            avg(Deaths) as Deaths, 
-            avg(Incaps) as Incaps, 
-            avg(nullif(boomer_kills,0)) as boomer_kills, 
-            avg(nullif(jockey_kills,0)) as jockey_kills, 
-            avg(nullif(smoker_kills,0)) as smoker_kills, 
-            avg(nullif(spitter_kills,0)) as spitter_kills, 
+            avg(Deaths) as Deaths,
+            avg(Incaps) as Incaps,
+            avg(nullif(boomer_kills,0)) as boomer_kills,
+            avg(nullif(jockey_kills,0)) as jockey_kills,
+            avg(nullif(smoker_kills,0)) as smoker_kills,
+            avg(nullif(spitter_kills,0)) as spitter_kills,
             avg(nullif(hunter_kills,0)) as hunter_kills,
             avg(nullif(charger_kills,0)) as charger_kills
-            FROM stats_games WHERE date_start > 0`)
+            FROM stats_games WHERE date_start > 0 AND date_end > 0`)
             let stats = {};
             if(topStats[0]) {
                 for(const key in topStats[0]) {
