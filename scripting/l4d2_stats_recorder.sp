@@ -782,8 +782,11 @@ void FlushQueuedStats(int client, bool disconnect) {
 		players[client].startedPlaying = GetTime();
 		minutes_played = 0;
 	}
-	//Prevent points from being reset by not recording until user has gotten a point. 
-	if(players[client].points > 0) {
+	//Always record stats if the player has played for at least 1 minute or has any meaningful activity
+	if(minutes_played > 0 || players[client].points > 0 ||
+	   GetEntProp(client, Prop_Send, "m_checkpointZombieKills") > 0 ||
+	   GetEntProp(client, Prop_Send, "m_checkpointDamageTaken") > 0 ||
+	   GetEntProp(client, Prop_Send, "m_checkpointReviveOtherCount") > 0) {
 		char query[1023];
 		Format(query, sizeof(query), "UPDATE stats_users SET survivor_damage_give=survivor_damage_give+%d,survivor_damage_rec=survivor_damage_rec+%d, infected_damage_give=infected_damage_give+%d,infected_damage_rec=infected_damage_rec+%d,survivor_ff=survivor_ff+%d,survivor_ff_rec=survivor_ff_rec+%d,common_kills=common_kills+%d,common_headshots=common_headshots+%d,melee_kills=melee_kills+%d,door_opens=door_opens+%d,damage_to_tank=damage_to_tank+%d, damage_witch=damage_witch+%d,minutes_played=minutes_played+%d, kills_witch=kills_witch+%d,points=%d,packs_used=packs_used+%d,damage_molotov=damage_molotov+%d,kills_molotov=kills_molotov+%d,kills_pipe=kills_pipe+%d,kills_minigun=kills_minigun+%d,clowns_honked=clowns_honked+%d,total_distance_travelled=total_distance_travelled+%d WHERE steamid='%s'",
 			//VARIABLE													//COLUMN NAME
