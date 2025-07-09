@@ -47,7 +47,9 @@
                             <li><span class="has-text-success">+200</span> per finale win</li>
                             <br>
                             <li><span class="has-text-danger">-500</span> for teammate kill</li>
-                            <li><span class="has-text-danger">-40</span> per teammate dmg</li>
+                            <li><span class="has-text-danger">-40</span> per teammate dmg <em>(11+ HP lost)</em></li>
+                            <li><span class="has-text-danger">-20</span> per teammate dmg <em>(6-10 HP lost)</em></li>
+                            <li><span class="has-text-danger">-10</span> per teammate dmg <em>(1-5 HP lost)</em></li>
                         </ul>
                         <br>
                         <p><strong>Tank Kill Points:</strong> When a tank is killed, the 100 points are distributed among all players who participated in the current game session based on their damage contribution. For example, if 4 players fight a tank and deal 50%, 30%, 15%, and 5% damage respectively, they receive 50, 30, 15, and 5 points. Solo and melee bonuses are awarded only to the player who delivers the killing blow.</p>

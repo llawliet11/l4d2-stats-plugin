@@ -1386,7 +1386,17 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 			players[attacker].damageInfectedGiven += dmg;
 		}
 		if(attacker_team == 2 && victim_team == 2) {
-			players[attacker].RecordPoint(PType_FriendlyFire, -40);
+			// Tiered friendly fire penalty based on damage amount
+			int penalty = 0;
+			if(dmg >= 11) {
+				penalty = -40;  // High damage: -40 points
+			} else if(dmg >= 6) {
+				penalty = -20;  // Medium damage: -20 points  
+			} else if(dmg < 5) {
+				penalty = -10;  // Low damage: -10 points
+			}
+			
+			players[attacker].RecordPoint(PType_FriendlyFire, penalty);
 			players[attacker].damageSurvivorFF += dmg;
 			players[attacker].damageSurvivorFFCount++;
 			players[victim].damageFFTaken += dmg;
