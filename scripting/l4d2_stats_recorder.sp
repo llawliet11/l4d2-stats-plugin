@@ -1495,14 +1495,14 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 			if(subject == client) {
 				IncrementStat(client, "heal_self", 1);
 			}else{
-				players[client].RecordPoint(PType_HealOther, 10);
+				players[client].RecordPoint(PType_HealOther, 50);
 				IncrementStat(client, "heal_others", 1);
 			}
 		} else if(StrEqual(name, "revive_success", true)) {
 			int subject = GetClientOfUserId(event.GetInt("subject"));
 			if(subject != client) {
 				IncrementStat(client, "revived_others", 1);
-				players[client].RecordPoint(PType_ReviveOther, 5);
+				players[client].RecordPoint(PType_ReviveOther, 25);
 				IncrementStat(subject, "revived", 1);
 			}
 		} else if(StrEqual(name, "defibrillator_used", true)) {
@@ -1518,7 +1518,7 @@ public void Event_UpgradePackUsed(Event event, const char[] name, bool dontBroad
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if(client > 0 && !IsFakeClient(client)) {
 		players[client].upgradePacksDeployed++;
-		players[client].RecordPoint(PType_DeployAmmo, 2);
+		players[client].RecordPoint(PType_DeployAmmo, 20);
 	}
 }
 public void Event_CarAlarm(Event event, const char[] name, bool dontBroadcast) {

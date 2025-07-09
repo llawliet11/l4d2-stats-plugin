@@ -40,10 +40,10 @@
                             <li><span class="has-text-success">+20</span> per tank kill solo (in addition to tank kill)</li>
                             <li><span class="has-text-success">+50</span> per tank kill melee (in addition to tank kill))</li>
                             <li><span class="has-text-success">+50</span> per witch kill</li>
-                            <li><span class="has-text-success">+10</span> per heal teammate</li>
-                            <li><span class="has-text-success">+5</span> per revive teammate</li>
+                            <li><span class="has-text-success">+50</span> per heal teammate</li>
+                            <li><span class="has-text-success">+25</span> per revive teammate</li>
                             <li><span class="has-text-success">+7</span> per teammate defibbed</li>
-                            <li><span class="has-text-success">+2</span> per ammo pack deploy</li>
+                            <li><span class="has-text-success">+20</span> per ammo pack deploy</li>
                             <li><span class="has-text-success">+200</span> per finale win</li>
                             <br>
                             <li><span class="has-text-danger">-500</span> for teammate kill</li>
