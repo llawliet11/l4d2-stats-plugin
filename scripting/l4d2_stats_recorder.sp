@@ -1448,6 +1448,34 @@ public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast)
 	int solo = event.GetBool("solo") ? 1 : 0;
 	int melee_only = event.GetBool("melee_only") ? 1 : 0;
 
+	// Calculate total damage dealt to tank by all players
+	int totalTankDamage = 0;
+	int playerDamage[MAXPLAYERS + 1];
+	
+	for(int i = 1; i <= MaxClients; i++) {
+		if(IsClientInGame(i) && !IsFakeClient(i)) {
+			playerDamage[i] = GetEntProp(i, Prop_Send, "m_checkpointDamageToTank");
+			totalTankDamage += playerDamage[i];
+		}
+	}
+	
+	// Distribute 100 points total based on damage contribution
+	if(totalTankDamage > 0) {
+		for(int i = 1; i <= MaxClients; i++) {
+			if(IsClientInGame(i) && !IsFakeClient(i) && playerDamage[i] > 0) {
+				// Calculate damage percentage and award points proportionally
+				float damagePercent = float(playerDamage[i]) / float(totalTankDamage);
+				int points = RoundToNearest(damagePercent * 100.0);
+				
+				if(points > 0) {
+					players[i].RecordPoint(PType_TankKill, points);
+					IncrementStat(i, "tanks_killed", 1);
+				}
+			}
+		}
+	}
+	
+	// Award bonus points only to the attacker (killer)
 	if(attacker > 0 && !IsFakeClient(attacker)) {
 		if(solo) {
 			IncrementStat(attacker, "tanks_killed_solo", 1);
@@ -1457,8 +1485,6 @@ public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast)
 			players[attacker].RecordPoint(PType_TankKill_Melee, 50);
 			IncrementStat(attacker, "tanks_killed_melee", 1);
 		}
-		players[attacker].RecordPoint(PType_TankKill, 100);
-		IncrementStat(attacker, "tanks_killed", 1);
 	}
 }
 public void Event_DoorOpened(Event event, const char[] name, bool dontBroadcast) {

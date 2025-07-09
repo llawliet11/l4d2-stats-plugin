@@ -36,9 +36,9 @@
                             <li><span class="has-text-success">+1</span> per common killed (any damage type)</li>
                             <li><span class="has-text-success">+2</span> per common headshot</li>
                             <li><span class="has-text-success">+6</span> per special kill</li>
-                            <li><span class="has-text-success">+100</span> per tank kill</li>
-                            <li><span class="has-text-success">+20</span> per tank kill solo (in addition to tank kill)</li>
-                            <li><span class="has-text-success">+50</span> per tank kill melee (in addition to tank kill))</li>
+                            <li><span class="has-text-success">+100</span> per tank kill <em>(total points distributed among all players in the session based on damage dealt)</em></li>
+                            <li><span class="has-text-success">+20</span> per tank kill solo <em>(bonus for killer only)</em></li>
+                            <li><span class="has-text-success">+50</span> per tank kill melee <em>(bonus for killer only)</em></li>
                             <li><span class="has-text-success">+50</span> per witch kill</li>
                             <li><span class="has-text-success">+50</span> per heal teammate</li>
                             <li><span class="has-text-success">+25</span> per revive teammate</li>
@@ -49,6 +49,8 @@
                             <li><span class="has-text-danger">-500</span> for teammate kill</li>
                             <li><span class="has-text-danger">-40</span> per teammate dmg</li>
                         </ul>
+                        <br>
+                        <p><strong>Tank Kill Points:</strong> When a tank is killed, the 100 points are distributed among all players who participated in the current game session based on their damage contribution. For example, if 4 players fight a tank and deal 50%, 30%, 15%, and 5% damage respectively, they receive 50, 30, 15, and 5 points. Solo and melee bonuses are awarded only to the player who delivers the killing blow.</p>
                     </div>
                 </div>
             </b-collapse>
