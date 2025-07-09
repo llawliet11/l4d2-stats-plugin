@@ -46,8 +46,8 @@
                             <li><span class="has-text-success">+2</span> per ammo pack deploy</li>
                             <li><span class="has-text-success">+200</span> per finale win</li>
                             <br>
-                            <li><span class="has-text-danger">-100</span> for teammate kill</li>
-                            <li><span class="has-text-danger">-10</span> per teammate dmg</li>
+                            <li><span class="has-text-danger">-500</span> for teammate kill</li>
+                            <li><span class="has-text-danger">-40</span> per teammate dmg</li>
                         </ul>
                     </div>
                 </div>
