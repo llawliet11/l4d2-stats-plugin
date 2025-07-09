@@ -10,22 +10,22 @@ Your Ubuntu 24 server should have:
 ## Step 1: Sync Your Code to Ubuntu Server
 
 ```bash
-# From your MacBook, sync the project to Ubuntu server
-rsync -avz -e "ssh -p 6969" \
+# From your local machine, sync the project to Ubuntu server
+rsync -avz -e "ssh -p YOUR_SSH_PORT" \
   --exclude=".git" \
   --exclude="node_modules" \
   --exclude=".DS_Store" \
   --exclude=".vscode" \
   --exclude=".idea" \
   --exclude=".env*" \
-  ./ niafam@192.168.1.99:/home/niafam/projects/GAMES/left4dead2-stats
+  ./ USERNAME@YOUR_SERVER_IP:/home/USERNAME/projects/GAMES/left4dead2-stats
 ```
 
 ## Step 2: Install Required Dependencies on Ubuntu
 
 ```bash
 # SSH into your Ubuntu server
-ssh niafam@192.168.1.99 -p 6969
+ssh USERNAME@YOUR_SERVER_IP -p YOUR_SSH_PORT
 
 # Update package list
 sudo apt update
@@ -71,7 +71,7 @@ wget -O ~/l4d2-includes/left4dhooks.inc \
 
 ```bash
 # Navigate to your project directory
-cd /home/niafam/projects/GAMES/left4dead2-stats
+cd /home/USERNAME/projects/GAMES/left4dead2-stats
 
 # Compile l4d2_stats_recorder.sp
 ~/sourcemod-compiler/addons/sourcemod/scripting/spcomp \
@@ -105,7 +105,7 @@ cat > ~/compile-l4d2-plugins.sh << 'EOF'
 
 set -e
 
-PROJECT_DIR="/home/niafam/projects/GAMES/left4dead2-stats"
+PROJECT_DIR="/home/USERNAME/projects/GAMES/left4dead2-stats"
 COMPILER="$HOME/sourcemod-compiler/addons/sourcemod/scripting/spcomp"
 INCLUDES="-i $PROJECT_DIR/scripting/include -i $HOME/sourcemod-compiler/addons/sourcemod/scripting/include -i $HOME/l4d2-includes"
 
@@ -174,15 +174,15 @@ chmod +x ~/compile-l4d2-plugins.sh
 ~/compile-l4d2-plugins.sh
 
 # Check compilation results
-ls -la /home/niafam/projects/GAMES/left4dead2-stats/plugins/
+ls -la /home/USERNAME/projects/GAMES/left4dead2-stats/plugins/
 ```
 
 ## Step 8: Sync Compiled Plugins Back to Mac
 
 ```bash
-# From your MacBook, sync the compiled plugins back
-rsync -avz -e "ssh -p 6969" \
-  niafam@192.168.1.99:/home/niafam/projects/GAMES/left4dead2-stats/plugins/ \
+# From your local machine, sync the compiled plugins back
+rsync -avz -e "ssh -p YOUR_SSH_PORT" \
+  USERNAME@YOUR_SERVER_IP:/home/USERNAME/projects/GAMES/left4dead2-stats/plugins/ \
   ./plugins/
 
 # Check the results
