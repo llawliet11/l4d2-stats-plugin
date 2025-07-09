@@ -6,3 +6,4 @@ node_modules
 databases.cfg
 .scripts
 .env.production
+.idea
