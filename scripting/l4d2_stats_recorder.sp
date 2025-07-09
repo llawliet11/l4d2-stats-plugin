@@ -67,6 +67,13 @@ int g_iLastBoomUser;
 float g_iLastBoomTime;
 Menu g_rateMenu;
 
+// Tank damage tracking for multiple tanks support
+int g_iTankDamage[MAXPLAYERS + 1];     // Per-tank damage tracking
+bool g_bTankInPlay = false;            // Is tank currently active
+int g_iTankClient = 0;                 // Current tank client ID
+int g_iTankHealth = 0;                 // Current tank health
+#define ZOMBIECLASS_TANK 8             // Tank zombie class ID
+
 char OFFICIAL_MAP_NAMES[14][] = {
 	"Dead Center",   // c1
 	"Dark Carnival", // c2
@@ -433,6 +440,8 @@ public void OnPluginStart() {
 	HookEvent("revive_success", Event_ItemUsed); //Yes it's not an item. No I don't care.
 	HookEvent("melee_kill", Event_MeleeKill);
 	HookEvent("tank_killed", Event_TankKilled);
+	HookEvent("tank_spawn", Event_TankSpawn);
+	HookEvent("player_hurt", Event_PlayerHurt);
 	HookEvent("witch_killed", Event_WitchKilled);
 	HookEvent("infected_hurt", Event_InfectedHurt);
 	HookEvent("infected_death", Event_InfectedDeath);
@@ -609,6 +618,27 @@ public void OnClientDisconnect(int client) {
 			RecordCampaign(client);
 			IncrementStat(client, "finales_won", 1);
 			players[client].RecordPoint(PType_FinishCampaign, 200);
+		}
+		
+		// Handle tank disconnection
+		if(g_bTankInPlay && g_iTankClient == client) {
+			// Try to find if tank passed to another player
+			int newTankClient = FindTankClient();
+			if(newTankClient > 0) {
+				g_iTankClient = newTankClient;
+				g_iTankHealth = GetClientHealth(newTankClient);
+				#if defined DEBUG
+				PrintToServer("[DEBUG] Tank passed to client %d", newTankClient);
+				#endif
+			} else {
+				// Tank disconnected without passing, reset tracking
+				g_bTankInPlay = false;
+				g_iTankClient = 0;
+				g_iTankHealth = 0;
+				#if defined DEBUG
+				PrintToServer("[DEBUG] Tank disconnected, resetting tracking");
+				#endif
+			}
 		}
 
 		FlushQueuedStats(client, true);
@@ -1453,33 +1483,69 @@ public void Event_MeleeKill(Event event, const char[] name, bool dontBroadcast) 
 		players[client].RecordPoint(PType_CommonKill, 1);
 	}
 }
+public void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast) {
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	if(client > 0 && IsClientInGame(client)) {
+		// Clear previous tank damage tracking
+		ClearTankDamage();
+		
+		// Set tank tracking variables
+		g_bTankInPlay = true;
+		g_iTankClient = client;
+		g_iTankHealth = GetClientHealth(client);
+		
+		#if defined DEBUG
+		PrintToServer("[DEBUG] Tank spawned: client=%d, health=%d", client, g_iTankHealth);
+		#endif
+	}
+}
+
+public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast) {
+	if(!g_bTankInPlay) return;
+	
+	int victim = GetClientOfUserId(event.GetInt("userid"));
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+	int damage = event.GetInt("dmg_health");
+	
+	// Check if victim is the current tank
+	if(victim == g_iTankClient && attacker > 0 && IsClientInGame(attacker) && !IsFakeClient(attacker)) {
+		// Track damage to current tank only
+		g_iTankDamage[attacker] += damage;
+		
+		#if defined DEBUG
+		PrintToServer("[DEBUG] Tank damage: attacker=%d, damage=%d, total=%d", attacker, damage, g_iTankDamage[attacker]);
+		#endif
+	}
+}
+
 public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast) {
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
 	int solo = event.GetBool("solo") ? 1 : 0;
 	int melee_only = event.GetBool("melee_only") ? 1 : 0;
 
-	// Calculate total damage dealt to tank by all players
+	// Calculate total damage dealt to this specific tank
 	int totalTankDamage = 0;
-	int playerDamage[MAXPLAYERS + 1];
-	
 	for(int i = 1; i <= MaxClients; i++) {
 		if(IsClientInGame(i) && !IsFakeClient(i)) {
-			playerDamage[i] = GetEntProp(i, Prop_Send, "m_checkpointDamageToTank");
-			totalTankDamage += playerDamage[i];
+			totalTankDamage += g_iTankDamage[i];
 		}
 	}
 	
-	// Distribute 100 points total based on damage contribution
+	// Distribute 100 points total based on damage contribution to this tank
 	if(totalTankDamage > 0) {
 		for(int i = 1; i <= MaxClients; i++) {
-			if(IsClientInGame(i) && !IsFakeClient(i) && playerDamage[i] > 0) {
+			if(IsClientInGame(i) && !IsFakeClient(i) && g_iTankDamage[i] > 0) {
 				// Calculate damage percentage and award points proportionally
-				float damagePercent = float(playerDamage[i]) / float(totalTankDamage);
+				float damagePercent = float(g_iTankDamage[i]) / float(totalTankDamage);
 				int points = RoundToNearest(damagePercent * 100.0);
 				
 				if(points > 0) {
 					players[i].RecordPoint(PType_TankKill, points);
 					IncrementStat(i, "tanks_killed", 1);
+					
+					#if defined DEBUG
+					PrintToServer("[DEBUG] Tank kill points: player=%d, damage=%d/%d (%.1f%%), points=%d", i, g_iTankDamage[i], totalTankDamage, damagePercent * 100.0, points);
+					#endif
 				}
 			}
 		}
@@ -1496,6 +1562,11 @@ public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast)
 			IncrementStat(attacker, "tanks_killed_melee", 1);
 		}
 	}
+	
+	// Reset tank tracking
+	g_bTankInPlay = false;
+	g_iTankClient = 0;
+	g_iTankHealth = 0;
 }
 public void Event_DoorOpened(Event event, const char[] name, bool dontBroadcast) {
 	int client = GetClientOfUserId(event.GetInt("userid"));
@@ -1569,6 +1640,24 @@ public void Event_WitchKilled(Event event, const char[] name, bool dontBroadcast
 		players[client].witchKills++;
 		players[client].RecordPoint(PType_WitchKill, 15);
 	}
+}
+
+// Tank damage tracking helper functions
+void ClearTankDamage() {
+	for(int i = 1; i <= MaxClients; i++) {
+		g_iTankDamage[i] = 0;
+	}
+}
+
+int FindTankClient() {
+	for(int i = 1; i <= MaxClients; i++) {
+		if(IsClientInGame(i) && GetClientTeam(i) == 3) {
+			if(GetEntProp(i, Prop_Send, "m_zombieClass") == ZOMBIECLASS_TANK) {
+				return i;
+			}
+		}
+	}
+	return 0;
 }
 
 
