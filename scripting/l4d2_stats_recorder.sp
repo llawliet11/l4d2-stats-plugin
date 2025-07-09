@@ -441,7 +441,6 @@ public void OnPluginStart() {
 	HookEvent("melee_kill", Event_MeleeKill);
 	HookEvent("tank_killed", Event_TankKilled);
 	HookEvent("tank_spawn", Event_TankSpawn);
-	HookEvent("player_hurt", Event_PlayerHurt);
 	HookEvent("witch_killed", Event_WitchKilled);
 	HookEvent("infected_hurt", Event_InfectedHurt);
 	HookEvent("infected_death", Event_InfectedDeath);
@@ -1433,6 +1432,16 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 			players[victim].damageFFTakenCount++;
 		}
 	}
+	
+	// Tank damage tracking for multiple tanks support
+	if(g_bTankInPlay && victim == g_iTankClient && attacker > 0 && IsClientInGame(attacker) && !IsFakeClient(attacker)) {
+		// Track damage to current tank only
+		g_iTankDamage[attacker] += dmg;
+		
+		#if defined DEBUG
+		PrintToServer("[DEBUG] Tank damage: attacker=%d, damage=%d, total=%d", attacker, dmg, g_iTankDamage[attacker]);
+		#endif
+	}
 }
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast) {
 	int victim = GetClientOfUserId(event.GetInt("userid"));
@@ -1500,23 +1509,6 @@ public void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast) 
 	}
 }
 
-public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast) {
-	if(!g_bTankInPlay) return;
-	
-	int victim = GetClientOfUserId(event.GetInt("userid"));
-	int attacker = GetClientOfUserId(event.GetInt("attacker"));
-	int damage = event.GetInt("dmg_health");
-	
-	// Check if victim is the current tank
-	if(victim == g_iTankClient && attacker > 0 && IsClientInGame(attacker) && !IsFakeClient(attacker)) {
-		// Track damage to current tank only
-		g_iTankDamage[attacker] += damage;
-		
-		#if defined DEBUG
-		PrintToServer("[DEBUG] Tank damage: attacker=%d, damage=%d, total=%d", attacker, damage, g_iTankDamage[attacker]);
-		#endif
-	}
-}
 
 public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast) {
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
