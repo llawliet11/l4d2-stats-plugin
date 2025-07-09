@@ -13,7 +13,7 @@
           @page-change="onPageChange"
       >
             <b-table-column field="type" label="Action" v-slot="props">
-                {{ getPointType(props.row.type) }}
+                {{ getActionDescription(props.row) }}
             </b-table-column>
             <b-table-column field="amount" label="Points" centered v-slot="props">
                 <span class="has-text-success" v-if="props.row.amount > 0">+{{ props.row.amount }}</span>
@@ -44,7 +44,7 @@
     "Solo Tank Kill", // PType_TankKill_Solo
     "Melee-Only Tank Kill",  // PType_TankKill_Melee,
     "Headshot",  // PType_Headshot,
-    "Friendly Fire",  // PType_FriendlyFire,
+    "Friendly Fire Penalty",  // PType_FriendlyFire,
     "Healing Teammate",  // PType_HealOther,
     "Reviving Teammate",  // PType_ReviveOther,
     "Defibbing Teammate",  // PType_ResurrectOther,
@@ -78,6 +78,27 @@
         },
         getPointType(type) {
           return POINT_TYPE_DISPLAY[type] ?? type
+        },
+        getActionDescription(row) {
+          const baseType = this.getPointType(row.type);
+          
+          // Add specific descriptions for friendly fire based on amount
+          if (row.type === 9) { // PType_FriendlyFire
+            switch(row.amount) {
+              case -500:
+                return "Teammate Kill";
+              case -40:
+                return "Teammate Damage (11+ HP)";
+              case -20:
+                return "Teammate Damage (6-10 HP)";
+              case -10:
+                return "Teammate Damage (1-5 HP)";
+              default:
+                return baseType;
+            }
+          }
+          
+          return baseType;
         },
         formatDate(date) {
           const d = new Date(date * 1000)
