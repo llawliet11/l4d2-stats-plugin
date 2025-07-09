@@ -4,3 +4,4 @@ node_modules
 *.sh
 .env
 databases.cfg
+.scripts
