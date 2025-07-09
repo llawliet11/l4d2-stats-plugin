@@ -606,7 +606,7 @@ export default {
         // fetchPlaystyle() {
         //     this.playstyle.data = null
         //     this.playstyle.error = null
-        //     this.$http.get(`https://jackz.me/l4d2/scripts/analyze.php?steamid=${this.user.steamid}&concise=1`)
+        //     // this.$http.get(`https://your-domain/l4d2/scripts/analyze.php?steamid=${this.user.steamid}&concise=1`)
         //     .then(res => {
         //         if(res.data.result)
         //           return this.playstyle.data = `${res.data.result.name} (${Math.round(res.data.result.value * 10000) / 10000})`
@@ -630,7 +630,7 @@ export default {
         //     this.playrating.data = null
         //     this.playrating.error = null
         //     const url = process.env.NODE_ENV === "production"
-        //         ? "https://admin.jackz.me/api/analyze/"
+        //         ? "https://your-domain/api/analyze/"
         //         : "http://localhost:8081/api/analyze/"
         //     this.$http.get(`${url}${this.user.steamid}`)
         //     .then(res => {

@@ -877,7 +877,7 @@ void SubmitPoints(int client) {
 				type,
 				amount,
 				timestamp,
-				i == players[client].pointsQueue.Length - 1 ? ' ' : ',' // No trailing comma on last entry
+				i == players[client].pointsQueue.Length - 1 ? ';' : ',' // Semicolon on last entry
 			);
 		}
 		SQL_TQuery(g_db, DBCT_Generic, query, QUERY_POINTS, DBPrio_Low);
@@ -1807,7 +1807,7 @@ void Event_FinaleWin(Event event, const char[] name, bool dontBroadcast) {
 				RecordCampaign(client);
 				IncrementStat(client, "finales_won", 1);
 				if(game.uuid[0] != '\0')
-					PrintToChat(client, "View this game's statistics at https://jackz.me/c/%s", shortID);
+					// PrintToChat(client, "View this game's statistics at <your-domain>/c/%s", shortID);
 				if(game.clownHonks > 0) {
 					PrintToChat(client, "%d clowns were honked this session, you honked %d", game.clownHonks, players[client].clownsHonked);
 				}
