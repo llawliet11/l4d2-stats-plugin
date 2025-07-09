@@ -1567,7 +1567,7 @@ public void Event_WitchKilled(Event event, const char[] name, bool dontBroadcast
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if(client > 0 && !IsFakeClient(client)) {
 		players[client].witchKills++;
-		players[client].RecordPoint(PType_WitchKill, 50);
+		players[client].RecordPoint(PType_WitchKill, 15);
 	}
 }
 

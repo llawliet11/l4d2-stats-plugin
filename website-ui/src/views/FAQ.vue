@@ -39,7 +39,7 @@
                             <li><span class="has-text-success">+100</span> per tank kill <em>(total points distributed among all players in the session based on damage dealt)</em></li>
                             <li><span class="has-text-success">+20</span> per tank kill solo <em>(bonus for killer only)</em></li>
                             <li><span class="has-text-success">+50</span> per tank kill melee <em>(bonus for killer only)</em></li>
-                            <li><span class="has-text-success">+50</span> per witch kill</li>
+                            <li><span class="has-text-success">+15</span> per witch kill</li>
                             <li><span class="has-text-success">+50</span> per heal teammate</li>
                             <li><span class="has-text-success">+25</span> per revive teammate</li>
                             <li><span class="has-text-success">+7</span> per teammate defibbed</li>
