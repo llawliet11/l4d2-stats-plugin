@@ -733,6 +733,44 @@ void IncrementStat(int client, const char[] name, int amount = 1, bool lowPriori
 	}
 }
 
+void GetTopWeapon(int client, char[] buffer, int maxlen) {
+	buffer[0] = '\0';
+	
+	if(players[client].wpn.pendingStats == null || players[client].wpn.pendingStats.Size == 0) {
+		return;
+	}
+	
+	// Also check the current weapon
+	if(players[client].wpn.classname[0] != '\0') {
+		WeaponStatistics stats;
+		players[client].wpn.pendingStats.GetArray(players[client].wpn.classname, stats, sizeof(stats));
+		stats.minutesUsed += (GetTime() - players[client].wpn.pickupTime);
+		players[client].wpn.pendingStats.SetArray(players[client].wpn.classname, stats, sizeof(stats));
+	}
+	
+	StringMapSnapshot snapshot = players[client].wpn.pendingStats.Snapshot();
+	char weaponName[64];
+	char topWeaponName[64];
+	float maxTime = 0.0;
+	WeaponStatistics stats;
+	
+	for(int i = 0; i < snapshot.Length; i++) {
+		snapshot.GetKey(i, weaponName, sizeof(weaponName));
+		players[client].wpn.pendingStats.GetArray(weaponName, stats, sizeof(stats));
+		
+		if(stats.minutesUsed > maxTime) {
+			maxTime = stats.minutesUsed;
+			strcopy(topWeaponName, sizeof(topWeaponName), weaponName);
+		}
+	}
+	
+	delete snapshot;
+	
+	if(topWeaponName[0] != '\0') {
+		strcopy(buffer, maxlen, topWeaponName);
+	}
+}
+
 void RecordCampaign(int client) {
 	if (client > 0 && IsClientInGame(client)) {
 		char query[1023];
@@ -744,8 +782,9 @@ void RecordCampaign(int client) {
 		char model[64];
 		GetClientModel(client, model, sizeof(model));
 
-		// unused now:
-		char topWeapon[1];
+		// Get the most used weapon
+		char topWeapon[64];
+		GetTopWeapon(client, topWeapon, sizeof(topWeapon));
 
 		int ping = GetEntProp(GetPlayerResourceEntity(), Prop_Send, "m_iPing", _, client);
 		if(ping < 0) ping = 0;
