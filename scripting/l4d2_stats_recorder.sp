@@ -496,7 +496,7 @@ public void OnPluginEnd() {
 
 #define MAX_MIGRATIONS 1
 char MIGRATIONS[MAX_MIGRATIONS][] = {
-	"alter table stats_users add total_distance_travelled float default 0 null"
+	"alter table stats_users add column if not exists total_distance_travelled float default 0 null"
 };
 
 void RunMigrations() {
