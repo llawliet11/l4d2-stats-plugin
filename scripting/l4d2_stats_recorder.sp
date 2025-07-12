@@ -881,7 +881,8 @@ void FlushQueuedStats(int client, bool disconnect) {
 	}
 	//Always record stats if the player has played for at least 1 minute or has any meaningful activity
 	//This prevents data loss for players who don't earn points but still participate
-	if(minutes_played > 0 || players[client].points > 0 ||
+	//FIXED: Include players with 0 or negative points in stats updates
+	if(minutes_played > 0 || players[client].points != 0 ||
 	   GetEntProp(client, Prop_Send, "m_checkpointZombieKills") > 0 ||
 	   GetEntProp(client, Prop_Send, "m_checkpointDamageTaken") > 0 ||
 	   GetEntProp(client, Prop_Send, "m_checkpointReviveOtherCount") > 0 ||
@@ -1350,6 +1351,31 @@ void DBCT_EnsureUserExists(Handle db, Handle child, const char[] error, int user
 		PrintToServer("[l4d2_stats_recorder] User confirmed exists for %N (%s), submitting %d queued points", 
 			client, players[client].steamid, players[client].pointsQueue.Length);
 		SubmitPointsNow(client);
+		
+		// CRITICAL: Also update total points in stats_users table immediately
+		// This ensures leaderboards show current points, not just game-end totals
+		char updateQuery[256];
+		Format(updateQuery, sizeof(updateQuery), 
+			"UPDATE stats_users SET points=%d WHERE steamid='%s'",
+			players[client].points, players[client].steamid);
+		SQL_TQuery(g_db, DBCT_UpdateTotalPoints, updateQuery, GetClientUserId(client));
+	}
+}
+
+// Callback for updating total points in stats_users
+void DBCT_UpdateTotalPoints(Handle db, Handle child, const char[] error, int userid) {
+	int client = GetClientOfUserId(userid);
+	if(db == null || child == null) {
+		LogError("[l4d2_stats_recorder] Failed to update total points: %s", error);
+		if(client > 0) {
+			PrintToServer("[l4d2_stats_recorder] ERROR: Could not update total points for %N (%s)", 
+				client, players[client].steamid);
+		}
+	} else {
+		if(client > 0 && IsClientInGame(client)) {
+			PrintToServer("[l4d2_stats_recorder] Successfully updated total points for %N (%s): %d", 
+				client, players[client].steamid, players[client].points);
+		}
 	}
 }
 

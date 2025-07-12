@@ -12,19 +12,19 @@ export default function(pool) {
             const offset = pageNumber * MAX_RESULTS;
             let rows, version
             if(req.query.version == "2") {
-                // Legacy v2 - but fixed to show all users with points or playtime
+                // Legacy v2 - show all users including those with 0 or negative points
                 [rows] = await pool.query(`SELECT
                      steamid,last_alias,minutes_played,last_join_date,points
                     FROM stats_users
-                    WHERE minutes_played > 0 OR points > 0
+                    WHERE minutes_played >= 0
                     ORDER BY points DESC, minutes_played DESC
                     LIMIT ?,?`,
                     [offset, MAX_RESULTS]
                 )
                 version = "v2"
             } else {
-                // Default: Use corrected database points (v1) - show all users with activity
-                [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` WHERE minutes_played > 0 OR points > 0 ORDER BY `points` DESC, `minutes_played` DESC LIMIT ?,?", [offset, MAX_RESULTS])
+                // Default: Use corrected database points (v1) - show all users including 0/negative points
+                [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` WHERE minutes_played >= 0 ORDER BY `points` DESC, `minutes_played` DESC LIMIT ?,?", [offset, MAX_RESULTS])
                 version = "v1"
             }
             res.json({
