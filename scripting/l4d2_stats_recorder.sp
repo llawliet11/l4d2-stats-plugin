@@ -953,6 +953,20 @@ void SubmitPoints(int client) {
 			return;
 		}
 		
+		// CRITICAL FIX: Ensure user exists before submitting points
+		// Use INSERT IGNORE to create user if not exists, then submit points
+		char setupQuery[512];
+		Format(setupQuery, sizeof(setupQuery), 
+			"INSERT IGNORE INTO stats_users (steamid, last_alias, created_date, last_join_date, points) VALUES ('%s', 'TempUser', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), 0)",
+			players[client].steamid);
+		SQL_TQuery(g_db, DBCT_EnsureUserExists, setupQuery, GetClientUserId(client));
+		return; // Points will be submitted after user creation is confirmed
+	}
+}
+
+// New function to actually submit points after ensuring user exists
+void SubmitPointsNow(int client) {
+	if(players[client].pointsQueue.Length > 0) {
 		char query[4098];
 		char escapedSteamId[64];
 		g_db.Escape(players[client].steamid, escapedSteamId, sizeof(escapedSteamId));
@@ -1120,6 +1134,18 @@ void IncrementSessionStat(int client) {
 public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[] error, any data) {
 	if(db == INVALID_HANDLE || results == INVALID_HANDLE) {
 		LogError("DBCT_CheckUserExistance returned error: %s", error);
+		// CRITICAL: If user lookup fails, try to ensure user exists anyway
+		int client = GetClientOfUserId(data);
+		if(client > 0 && IsClientInGame(client) && strlen(players[client].steamid) > 0) {
+			PrintToServer("[l4d2_stats_recorder] User lookup failed for %N (%s), attempting emergency user creation", 
+				client, players[client].steamid);
+			
+			char emergencyQuery[512];
+			Format(emergencyQuery, sizeof(emergencyQuery), 
+				"INSERT IGNORE INTO stats_users (steamid, last_alias, created_date, last_join_date, points) VALUES ('%s', 'EmergencyUser', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), 0)",
+				players[client].steamid);
+			SQL_TQuery(g_db, DBCT_EmergencyUserCreation, emergencyQuery, GetClientUserId(client));
+		}
 		return;
 	}
 	//initialize variables
@@ -1299,6 +1325,45 @@ void DBCT_NameHistoryUpdate(Handle db, Handle child, const char[] error, int use
 		int client = GetClientOfUserId(userid);
 		if(client > 0) {
 			PrintToServer("[l4d2_stats_recorder] Name history updated successfully for %N", client);
+		}
+	}
+}
+
+// Callback to ensure user exists before submitting points
+void DBCT_EnsureUserExists(Handle db, Handle child, const char[] error, int userid) {
+	int client = GetClientOfUserId(userid);
+	
+	if(db == null || child == null) {
+		LogError("[l4d2_stats_recorder] Failed to ensure user exists: %s", error);
+		if(client > 0) {
+			PrintToServer("[l4d2_stats_recorder] ERROR: Cannot create user for %N (%s) - points may be lost!", 
+				client, players[client].steamid);
+		}
+		return;
+	}
+	
+	// User now exists (either was created or already existed)
+	if(client > 0 && IsClientInGame(client)) {
+		PrintToServer("[l4d2_stats_recorder] User confirmed exists for %N (%s), submitting %d queued points", 
+			client, players[client].steamid, players[client].pointsQueue.Length);
+		SubmitPointsNow(client);
+	}
+}
+
+// Emergency user creation callback
+void DBCT_EmergencyUserCreation(Handle db, Handle child, const char[] error, int userid) {
+	int client = GetClientOfUserId(userid);
+	
+	if(db == null || child == null) {
+		LogError("[l4d2_stats_recorder] Emergency user creation failed: %s", error);
+		if(client > 0) {
+			PrintToServer("[l4d2_stats_recorder] CRITICAL: Emergency user creation failed for %N (%s)", 
+				client, players[client].steamid);
+		}
+	} else {
+		if(client > 0) {
+			PrintToServer("[l4d2_stats_recorder] Emergency user created successfully for %N (%s)", 
+				client, players[client].steamid);
 		}
 	}
 }
