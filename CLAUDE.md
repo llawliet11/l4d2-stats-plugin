@@ -128,3 +128,7 @@ The system tracks comprehensive L4D2 gameplay statistics including:
 - Session-based gameplay tracking
 - Geographic player data via GeoIP
 - Campaign progress and scoring
+
+## Development Notes
+
+- There is no need to compile. I will do manually
