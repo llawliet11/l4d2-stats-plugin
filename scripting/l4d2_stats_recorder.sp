@@ -2042,7 +2042,11 @@ public void Event_VersusRoundStart(Event event, const char[] name, bool dontBroa
 public void Event_MapTransition(Event event, const char[] name, bool dontBroadcast) {
 	isTransition = true;
 	for(int i = 1; i <= MaxClients; i++) {
-		if(IsClientInGame(i) && GetClientTeam(i) == 2 && IsPlayerAlive(i) && !IsFakeClient(i)) {
+		// CRITICAL FIX: Process ALL survivor team players, dead or alive
+		// Dead players also need their points submitted during map transitions!
+		if(IsClientInGame(i) && GetClientTeam(i) == 2 && !IsFakeClient(i)) {
+			bool isAlive = IsPlayerAlive(i);
+			PrintToServer("[l4d2_stats_recorder] Map transition - flushing stats for %N (alive: %s)", i, isAlive ? "yes" : "no");
 			IncrementSessionStat(i);
 			FlushQueuedStats(i, false);
 		}
@@ -2053,7 +2057,11 @@ public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast) {
 	game.finished = false;
 	
 	for(int i = 1; i <= MaxClients; i++) {
-		if(IsClientInGame(i) && GetClientTeam(i) == 2 && IsPlayerAlive(i)) {
+		// CRITICAL FIX: Process ALL survivor team players, dead or alive
+		// Dead players also need their points submitted!
+		if(IsClientInGame(i) && GetClientTeam(i) == 2) {
+			bool isAlive = IsPlayerAlive(i);
+			PrintToServer("[l4d2_stats_recorder] Flushing stats for %N (alive: %s)", i, isAlive ? "yes" : "no");
 			//ResetSessionStats(i, false);
 			FlushQueuedStats(i, false);
 		}
