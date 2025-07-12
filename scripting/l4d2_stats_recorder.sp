@@ -699,15 +699,26 @@ bool ConnectDB() {
 //Setups a user, this tries to fetch user by steamid
 void SetupUserInDB(int client, const char steamid[32]) {
 	if(client > 0 && !IsFakeClient(client)) {
+		// Validate Steam ID format
+		if(strlen(steamid) < 8 || StrContains(steamid, "STEAM_") != 0) {
+			LogError("[l4d2_stats_recorder] Invalid Steam ID format for client %d: '%s'", client, steamid);
+			PrintToServer("[l4d2_stats_recorder] ERROR: Invalid Steam ID format for %N: '%s'", client, steamid);
+			return;
+		}
+		
 		players[client].ResetFull();
 
 		strcopy(players[client].steamid, 32, steamid);
 		players[client].startedPlaying = GetTime();
-		char query[128];
 		
-
+		PrintToServer("[l4d2_stats_recorder] Setting up user %N with Steam ID: %s", client, steamid);
+		
+		char query[256];
+		char escapedSteamId[64];
+		g_db.Escape(steamid, escapedSteamId, sizeof(escapedSteamId));
+		
 		// TODO: 	connections, first_join last_join
-		Format(query, sizeof(query), "SELECT last_alias,points,connections,created_date,last_join_date FROM stats_users WHERE steamid='%s'", steamid);
+		Format(query, sizeof(query), "SELECT last_alias,points,connections,created_date,last_join_date FROM stats_users WHERE steamid='%s'", escapedSteamId);
 		SQL_TQuery(g_db, DBCT_CheckUserExistance, query, GetClientUserId(client));
 	}
 }
@@ -904,7 +915,23 @@ void FlushQueuedStats(int client, bool disconnect) {
 
 void SubmitPoints(int client) {
 	if(players[client].pointsQueue.Length > 0) {
+		// Check database connection
+		if(g_db == null) {
+			LogError("[l4d2_stats_recorder] Database not connected. Cannot submit points for client %d", client);
+			return;
+		}
+		
+		// Validate Steam ID before submitting
+		if(strlen(players[client].steamid) < 8 || StrContains(players[client].steamid, "STEAM_") != 0) {
+			LogError("[l4d2_stats_recorder] Invalid Steam ID for client %d: '%s'. Points not submitted.", client, players[client].steamid);
+			players[client].pointsQueue.Clear();
+			return;
+		}
+		
 		char query[4098];
+		char escapedSteamId[64];
+		g_db.Escape(players[client].steamid, escapedSteamId, sizeof(escapedSteamId));
+		
 		Format(query, sizeof(query), "INSERT INTO stats_points (steamid,type,amount,timestamp) VALUES ");
 		for(int i = 0; i < players[client].pointsQueue.Length; i++) {
 			int type = players[client].pointsQueue.Get(i, 0);
@@ -912,15 +939,15 @@ void SubmitPoints(int client) {
 			int timestamp = players[client].pointsQueue.Get(i, 2);
 			Format(query, sizeof(query), "%s('%s',%d,%d,%d)%c",
 				query,
-				players[client].steamid,
+				escapedSteamId,
 				type,
 				amount,
 				timestamp,
 				i == players[client].pointsQueue.Length - 1 ? ';' : ',' // Semicolon on last entry
 			);
 		}
-		SQL_TQuery(g_db, DBCT_Generic, query, QUERY_POINTS, DBPrio_Low);
-		players[client].pointsQueue.Clear();
+		SQL_TQuery(g_db, DBCT_SubmitPoints, query, GetClientUserId(client), DBPrio_Low);
+		// Don't clear the queue here - wait for confirmation
 	}
 }
 
@@ -1108,7 +1135,13 @@ public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[]
 		players[client].lastJoinedTime = results.FetchInt(4);
 
 		if(players[client].points == 0) {
-			PrintToServer("[l4d2_stats_recorder] Warning: Existing player %N (%d) has no points", client, client);
+			PrintToServer("[l4d2_stats_recorder] Warning: Existing player %N (%s) has 0 points in database", client, players[client].steamid);
+			// Check if there are orphaned point records
+			char checkQuery[256];
+			Format(checkQuery, sizeof(checkQuery), "SELECT COUNT(*) as count, SUM(amount) as total FROM stats_points WHERE steamid='%s'", players[client].steamid);
+			SQL_TQuery(g_db, DBCT_CheckOrphanedPoints, checkQuery, GetClientUserId(client));
+		} else {
+			PrintToServer("[l4d2_stats_recorder] Player %N (%s) loaded with %d points", client, players[client].steamid, players[client].points);
 		}
 		int connections_amount = lateLoaded ? 0 : 1;
 
@@ -1126,9 +1159,85 @@ void DBCT_Generic(Handle db, Handle child, const char[] error, queryType data) {
 	if(db == null || child == null) {
 		if(data != QUERY_ANY) {
 			LogError("DBCT_Generic query `%s` returned error: %s", QUERY_TYPE_ID[data], error);
+			if(data == QUERY_POINTS) {
+				PrintToServer("[l4d2_stats_recorder] ERROR: Failed to submit points to database!");
+			}
 		} else {
 			LogError("DBCT_Generic returned error: %s", error);
 		}
+	}
+}
+
+void DBCT_SubmitPoints(Handle db, Handle child, const char[] error, int userid) {
+	int client = GetClientOfUserId(userid);
+	if(db == null || child == null) {
+		LogError("[l4d2_stats_recorder] Failed to submit points: %s", error);
+		PrintToServer("[l4d2_stats_recorder] ERROR: Failed to submit points for client %d!", client);
+		// Don't clear the queue on error - retry later
+	} else {
+		// Success - clear the queue
+		if(client > 0 && IsClientInGame(client)) {
+			players[client].pointsQueue.Clear();
+		}
+	}
+}
+
+void DBCT_CheckOrphanedPoints(Handle db, Handle results, const char[] error, int userid) {
+	int client = GetClientOfUserId(userid);
+	if(client <= 0 || !IsClientInGame(client)) return;
+	
+	if(db == null || results == null) {
+		LogError("[l4d2_stats_recorder] Failed to check orphaned points: %s", error);
+		return;
+	}
+	
+	if(SQL_FetchRow(results)) {
+		int count = SQL_FetchInt(results, 0);
+		int total = SQL_IsFieldNull(results, 1) ? 0 : SQL_FetchInt(results, 1);
+		
+		if(count > 0) {
+			PrintToServer("[l4d2_stats_recorder] Found %d orphaned point records for %N (%s) totaling %d points!", 
+				count, client, players[client].steamid, total);
+			
+			// Fix the points total
+			if(total != 0) {
+				char fixQuery[256];
+				Format(fixQuery, sizeof(fixQuery), "UPDATE stats_users SET points=(SELECT COALESCE(SUM(amount),0) FROM stats_points WHERE steamid='%s') WHERE steamid='%s'", 
+					players[client].steamid, players[client].steamid);
+				SQL_TQuery(g_db, DBCT_FixPoints, fixQuery, GetClientUserId(client));
+			}
+		}
+	}
+}
+
+void DBCT_FixPoints(Handle db, Handle child, const char[] error, int userid) {
+	int client = GetClientOfUserId(userid);
+	if(db == null || child == null) {
+		LogError("[l4d2_stats_recorder] Failed to fix points: %s", error);
+	} else {
+		if(client > 0 && IsClientInGame(client)) {
+			// Reload player points
+			char query[256];
+			Format(query, sizeof(query), "SELECT points FROM stats_users WHERE steamid='%s'", players[client].steamid);
+			SQL_TQuery(g_db, DBCT_ReloadPoints, query, GetClientUserId(client));
+		}
+	}
+}
+
+void DBCT_ReloadPoints(Handle db, Handle results, const char[] error, int userid) {
+	int client = GetClientOfUserId(userid);
+	if(client <= 0 || !IsClientInGame(client)) return;
+	
+	if(db == null || results == null) {
+		LogError("[l4d2_stats_recorder] Failed to reload points: %s", error);
+		return;
+	}
+	
+	if(SQL_FetchRow(results)) {
+		int oldPoints = players[client].points;
+		players[client].points = SQL_FetchInt(results, 0);
+		PrintToServer("[l4d2_stats_recorder] Fixed points for %N (%s): %d -> %d", 
+			client, players[client].steamid, oldPoints, players[client].points);
 	}
 }
 
