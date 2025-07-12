@@ -352,15 +352,11 @@ enum struct Player {
 		
 		PrintToServer("[l4d2_stats_recorder] RecordPoint: %s earned %d points (type: %d), total: %d", this.steamid, amount, type, this.points);
 		
-		// Common kills are too spammy 
-		if(type != PType_CommonKill) {
-			int index = this.pointsQueue.Push(type);
-			this.pointsQueue.Set(index, amount, 1);
-			this.pointsQueue.Set(index, GetTime(), 2);
-			PrintToServer("[l4d2_stats_recorder] Queued point record: type=%d, amount=%d, queue size=%d", type, amount, this.pointsQueue.Length);
-		} else {
-			PrintToServer("[l4d2_stats_recorder] Common kill point added locally only (not queued): %d", amount);
-		}
+		// Queue ALL point types for database submission (including common kills)
+		int index = this.pointsQueue.Push(type);
+		this.pointsQueue.Set(index, amount, 1);
+		this.pointsQueue.Set(index, GetTime(), 2);
+		PrintToServer("[l4d2_stats_recorder] Queued point record: type=%d, amount=%d, queue size=%d", type, amount, this.pointsQueue.Length);
 	}
 
 	void MeasureDistance(int client) {
@@ -939,20 +935,20 @@ void FlushQueuedStats(int client, bool disconnect) {
 }
 
 void SubmitPoints(int client) {
+	// Check database connection
+	if(g_db == null) {
+		LogError("[l4d2_stats_recorder] Database not connected. Cannot submit points for client %d", client);
+		return;
+	}
+	
+	// Validate Steam ID before submitting
+	if(strlen(players[client].steamid) < 8 || StrContains(players[client].steamid, "STEAM_") != 0) {
+		LogError("[l4d2_stats_recorder] Invalid Steam ID for client %d: '%s'. Points not submitted.", client, players[client].steamid);
+		return;
+	}
+	
+	// Submit points regardless of queue length - important for players with 0 or negative points
 	if(players[client].pointsQueue.Length > 0) {
-		// Check database connection
-		if(g_db == null) {
-			LogError("[l4d2_stats_recorder] Database not connected. Cannot submit points for client %d", client);
-			return;
-		}
-		
-		// Validate Steam ID before submitting
-		if(strlen(players[client].steamid) < 8 || StrContains(players[client].steamid, "STEAM_") != 0) {
-			LogError("[l4d2_stats_recorder] Invalid Steam ID for client %d: '%s'. Points not submitted.", client, players[client].steamid);
-			players[client].pointsQueue.Clear();
-			return;
-		}
-		
 		// CRITICAL FIX: Ensure user exists before submitting points
 		// Use INSERT IGNORE to create user if not exists, then submit points
 		char setupQuery[512];
@@ -960,7 +956,14 @@ void SubmitPoints(int client) {
 			"INSERT IGNORE INTO stats_users (steamid, last_alias, created_date, last_join_date, points) VALUES ('%s', 'TempUser', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), 0)",
 			players[client].steamid);
 		SQL_TQuery(g_db, DBCT_EnsureUserExists, setupQuery, GetClientUserId(client));
-		return; // Points will be submitted after user creation is confirmed
+	} else {
+		PrintToServer("[l4d2_stats_recorder] No queued points for %s, but ensuring user exists", players[client].steamid);
+		// Still ensure user exists even with no points to queue
+		char setupQuery[512];
+		Format(setupQuery, sizeof(setupQuery), 
+			"INSERT IGNORE INTO stats_users (steamid, last_alias, created_date, last_join_date, points) VALUES ('%s', 'TempUser', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), 0)",
+			players[client].steamid);
+		SQL_TQuery(g_db, DBCT_EnsureUserExists, setupQuery, GetClientUserId(client));
 	}
 }
 
