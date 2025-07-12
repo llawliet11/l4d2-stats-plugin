@@ -343,11 +343,21 @@ enum struct Player {
 
 	void RecordPoint(PointRecordType type, int amount = 1) {
 		this.points += amount;
+		// Debug logging for point recording
+		if(strlen(this.steamid) > 0) {
+			PrintToServer("[l4d2_stats_recorder] RecordPoint: %s earned %d points (type: %d), total: %d", this.steamid, amount, type, this.points);
+		} else {
+			PrintToServer("[l4d2_stats_recorder] WARNING: RecordPoint called for player with empty Steam ID!");
+		}
+		
 		// Common kills are too spammy 
 		if(type != PType_CommonKill) {
 			int index = this.pointsQueue.Push(type);
 			this.pointsQueue.Set(index, amount, 1);
 			this.pointsQueue.Set(index, GetTime(), 2);
+			PrintToServer("[l4d2_stats_recorder] Queued point record: type=%d, amount=%d, queue size=%d", type, amount, this.pointsQueue.Length);
+		} else {
+			PrintToServer("[l4d2_stats_recorder] Common kill point added locally only (not queued): %d", amount);
 		}
 	}
 
@@ -471,6 +481,7 @@ public void OnPluginStart() {
 	RegAdminCmd("sm_stats", Command_PlayerStats, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_heatmaps", Command_Heatmaps, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_heatmap", Command_Heatmaps, ADMFLAG_GENERIC);
+	RegAdminCmd("sm_debug_points", Command_CheckPlayerPoints, ADMFLAG_GENERIC, "Debug player point recording status");
 	RegConsoleCmd("sm_rate", Command_RateMap);
 
 	AutoExecConfig(true, "l4d2_stats_recorder");
@@ -596,10 +607,19 @@ public Action Timer_HonkCounter(Handle h) {
 // PLAYER AUTH
 /////////////////////////////////
 public void OnClientAuthorized(int client, const char[] auth) {
+	PrintToServer("[l4d2_stats_recorder] OnClientAuthorized: client=%d, auth='%s'", client, auth);
+	
 	if(client > 0 && !IsFakeClient(client)) {
 		char steamid[32];
 		strcopy(steamid, sizeof(steamid), auth);
+		PrintToServer("[l4d2_stats_recorder] Processing authorization for %N (client %d)", client, client);
 		SetupUserInDB(client, steamid);
+	} else {
+		if(client <= 0) {
+			PrintToServer("[l4d2_stats_recorder] OnClientAuthorized: Invalid client ID %d", client);
+		} else if(IsFakeClient(client)) {
+			PrintToServer("[l4d2_stats_recorder] OnClientAuthorized: Client %d is fake client (bot), skipping", client);
+		}
 	}
 }
 public void OnClientPutInServer(int client) {
@@ -899,6 +919,9 @@ void FlushQueuedStats(int client, bool disconnect) {
 		);
 		
 		//If disconnected, can't put on another thread for some reason: Push it out fast
+		PrintToServer("[l4d2_stats_recorder] Flushing stats for %N (SteamID: %s, Points: %d, Queue size: %d)", 
+			client, players[client].steamid, players[client].points, players[client].pointsQueue.Length);
+			
 		if(disconnect) {
 			SQL_LockDatabase(g_db);
 			SQL_FastQuery(g_db, query);
@@ -1519,7 +1542,12 @@ public void Event_InfectedHurt(Event event, const char[] name, bool dontBroadcas
 }
 public void Event_InfectedDeath(Event event, const char[] name, bool dontBroadcast) {
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+	PrintToServer("[l4d2_stats_recorder] InfectedDeath event: attacker=%d", attacker);
+	
 	if(attacker > 0 && !IsFakeClient(attacker)) {
+		PrintToServer("[l4d2_stats_recorder] Valid attacker %N (ID:%d, Team:%d, SteamID:'%s')", 
+			attacker, attacker, GetClientTeam(attacker), players[attacker].steamid);
+			
 		bool blast = event.GetBool("blast");
 		bool headshot = event.GetBool("headshot");
 		bool using_minigun = event.GetBool("minigun");
@@ -1532,11 +1560,16 @@ public void Event_InfectedDeath(Event event, const char[] name, bool dontBroadca
 		players[attacker].RecordPoint(PType_CommonKill, 1);
 		players[attacker].wpn.kills++;
 
-
 		if(using_minigun) {
 			players[attacker].minigunKills++;
 		} else if(blast) {
 			players[attacker].pipeKills++;
+		}
+	} else {
+		if(attacker <= 0) {
+			PrintToServer("[l4d2_stats_recorder] InfectedDeath: Invalid attacker ID %d", attacker);
+		} else if(IsFakeClient(attacker)) {
+			PrintToServer("[l4d2_stats_recorder] InfectedDeath: Attacker %d is fake client (bot)", attacker);
 		}
 	}
 }
@@ -2040,6 +2073,25 @@ public void OnSpecialClear( int clearer, int pinner, int pinvictim, int zombieCl
 public any Native_GetPoints(Handle plugin, int numParams) {
 	int client = GetNativeCell(1);
 	return players[client].points;
+}
+
+// Debug command to check player point status
+public Action Command_CheckPlayerPoints(int client, int args) {
+	PrintToServer("[l4d2_stats_recorder] === Player Points Status Debug ===");
+	
+	for(int i = 1; i <= MaxClients; i++) {
+		if(IsClientInGame(i) && !IsFakeClient(i)) {
+			PrintToServer("[l4d2_stats_recorder] Player %N (ID:%d):", i, i);
+			PrintToServer("  - Team: %d", GetClientTeam(i));
+			PrintToServer("  - SteamID: '%s'", players[i].steamid);
+			PrintToServer("  - Points: %d", players[i].points);
+			PrintToServer("  - Queue size: %d", players[i].pointsQueue.Length);
+			PrintToServer("  - Minutes played: %d", (GetTime() - players[i].startedPlaying) / 60);
+		}
+	}
+	
+	PrintToServer("[l4d2_stats_recorder] === End Debug ===");
+	return Plugin_Handled;
 }
 
 ////////////////////////////

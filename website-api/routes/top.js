@@ -3,7 +3,7 @@ const router = Router()
 import routeCache from 'route-cache'
 
 export default function(pool) {
-    router.get('/users/:page?', routeCache.cacheSeconds(60), async(req,res) => {
+    router.get('/users/:page?', routeCache.cacheSeconds(30), async(req,res) => {
         try {
             const MAX_RESULTS = req.query.max_results ? parseInt(req.query.max_results) || 15 : 15;
     
@@ -12,19 +12,19 @@ export default function(pool) {
             const offset = pageNumber * MAX_RESULTS;
             let rows, version
             if(req.query.version == "2") {
-                // Legacy v2 calculated points (kept for compatibility)
-                [rows] = await pool.query(`select
+                // Legacy v2 - but fixed to show all users with points or playtime
+                [rows] = await pool.query(`SELECT
                      steamid,last_alias,minutes_played,last_join_date,points
-                    from stats_users
-                    WHERE minutes_played > 0
-                    order by points desc
-                    limit ?,?`,
+                    FROM stats_users
+                    WHERE minutes_played > 0 OR points > 0
+                    ORDER BY points DESC, minutes_played DESC
+                    LIMIT ?,?`,
                     [offset, MAX_RESULTS]
                 )
                 version = "v2"
             } else {
-                // Default: Use corrected database points (v1)
-                [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` ORDER BY `points` DESC, `minutes_played` DESC LIMIT ?,?", [offset, MAX_RESULTS])
+                // Default: Use corrected database points (v1) - show all users with activity
+                [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` WHERE minutes_played > 0 OR points > 0 ORDER BY `points` DESC, `minutes_played` DESC LIMIT ?,?", [offset, MAX_RESULTS])
                 version = "v1"
             }
             res.json({
@@ -36,7 +36,7 @@ export default function(pool) {
             res.status(500).json({error:"Internal Server Error"})
         }
     })
-    router.get('/stats', routeCache.cacheSeconds(43200), async(req,res) => {
+    router.get('/stats', routeCache.cacheSeconds(300), async(req,res) => {
         try {
             const [deaths] = await pool.execute(`SELECT steamid,last_alias,points,survivor_deaths as value FROM \`stats_users\`  
                 WHERE survivor_deaths > 0 ORDER BY \`stats_users\`.\`survivor_deaths\` desc, \`stats_users\`.\`points\` desc limit 10`, [])
@@ -79,5 +79,21 @@ export default function(pool) {
             res.status(500).json({error:"Internal Server Error"})
         }
     })
+    
+    // Cache clearing endpoint for debugging
+    router.post('/clear-cache', async(req,res) => {
+        try {
+            // Clear route cache if available
+            if(routeCache.removeCache) {
+                routeCache.removeCache('/api/top/users');
+                routeCache.removeCache('/api/top/stats');
+            }
+            res.json({success: true, message: 'Cache cleared'});
+        } catch(err) {
+            console.error('[/api/top/clear-cache]', err.message);
+            res.status(500).json({error: 'Failed to clear cache'});
+        }
+    })
+    
     return router;
 }
