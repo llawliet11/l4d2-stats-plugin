@@ -343,12 +343,14 @@ enum struct Player {
 
 	void RecordPoint(PointRecordType type, int amount = 1) {
 		this.points += amount;
-		// Debug logging for point recording
-		if(strlen(this.steamid) > 0) {
-			PrintToServer("[l4d2_stats_recorder] RecordPoint: %s earned %d points (type: %d), total: %d", this.steamid, amount, type, this.points);
-		} else {
-			PrintToServer("[l4d2_stats_recorder] WARNING: RecordPoint called for player with empty Steam ID!");
+		
+		// STEAM ID-CENTRIC: Only proceed if we have a valid Steam ID
+		if(strlen(this.steamid) < 8 || StrContains(this.steamid, "STEAM_") != 0) {
+			LogError("[l4d2_stats_recorder] CRITICAL: RecordPoint called with invalid Steam ID: '%s' - points may be lost!", this.steamid);
+			return; // Protect against corrupted data
 		}
+		
+		PrintToServer("[l4d2_stats_recorder] RecordPoint: %s earned %d points (type: %d), total: %d", this.steamid, amount, type, this.points);
 		
 		// Common kills are too spammy 
 		if(type != PType_CommonKill) {
@@ -1127,8 +1129,22 @@ public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[]
 	char alias[MAX_NAME_LENGTH], ip[40], country_name[45];
 	char[] safe_alias = new char[alias_length];
 
-	//Get a SQL-safe player name, and their counttry and IP
+	//Get a SQL-safe player name, and their country and IP
 	GetClientName(client, alias, sizeof(alias));
+	
+	// CRITICAL FIX: Never block user setup due to name issues - use fallback
+	if(strlen(alias) == 0) {
+		// Generate fallback name from Steam ID
+		char steamid_short[16];
+		strcopy(steamid_short, sizeof(steamid_short), players[client].steamid[8]); // Skip "STEAM_0:"
+		Format(alias, sizeof(alias), "Player_%s", steamid_short);
+		LogMessage("[l4d2_stats_recorder] Using fallback name for player %d: '%s' (SteamID: %s)", 
+			client, alias, players[client].steamid);
+	}
+	
+	PrintToServer("[l4d2_stats_recorder] Processing player %N with name '%s' (length: %d, SteamID: %s)", 
+		client, alias, strlen(alias), players[client].steamid);
+		
 	SQL_EscapeString(g_db, alias, safe_alias, alias_length);
 	GetClientIP(client, ip, sizeof(ip));
 	GeoipCountry(ip, country_name, sizeof(country_name));
@@ -1156,6 +1172,9 @@ public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[]
 		players[client].connections = results.FetchInt(2);
 		players[client].firstJoinedTime = results.FetchInt(3);
 		players[client].lastJoinedTime = results.FetchInt(4);
+		
+		PrintToServer("[l4d2_stats_recorder] Existing user %N: alias='%s', prev='%s', points=%d", 
+			client, safe_alias, prevName, players[client].points);
 
 		if(players[client].points == 0) {
 			PrintToServer("[l4d2_stats_recorder] Warning: Existing player %N (%s) has 0 points in database", client, players[client].steamid);
@@ -1171,9 +1190,11 @@ public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[]
 		Format(query, sizeof(query), "UPDATE `stats_users` SET `last_alias`='%s', `last_join_date`=UNIX_TIMESTAMP(), `country`='%s', connections=connections+%d WHERE `steamid`='%s'", safe_alias, country_name, connections_amount, players[client].steamid);
 		g_db.Query(DBCT_Generic, query, QUERY_UPDATE_USER);
 		if(!StrEqual(prevName, alias)) {
-			// Add prev name to history
-			g_db.Format(query, sizeof(query), "INSERT INTO user_names_history (steamid, name, created) VALUES ('%s','%s', UNIX_TIMESTAMP())", players[client].steamid, alias);
-			g_db.Query(DBCT_Generic, query, QUERY_UPDATE_NAME_HISTORY);
+			// Add prev name to history - NON-BLOCKING: Name history is for display only
+			PrintToServer("[l4d2_stats_recorder] Adding name '%s' -> '%s' to history for %N (SteamID: %s)", 
+				prevName, safe_alias, client, players[client].steamid);
+			g_db.Format(query, sizeof(query), "INSERT INTO user_names_history (steamid, name, created) VALUES ('%s','%s', UNIX_TIMESTAMP())", players[client].steamid, safe_alias);
+			g_db.Query(DBCT_NameHistoryUpdate, query, GetClientUserId(client));
 		}
 	}
 }
@@ -1184,6 +1205,10 @@ void DBCT_Generic(Handle db, Handle child, const char[] error, queryType data) {
 			LogError("DBCT_Generic query `%s` returned error: %s", QUERY_TYPE_ID[data], error);
 			if(data == QUERY_POINTS) {
 				PrintToServer("[l4d2_stats_recorder] ERROR: Failed to submit points to database!");
+			} else if(data == QUERY_UPDATE_NAME_HISTORY) {
+				PrintToServer("[l4d2_stats_recorder] ERROR: Failed to insert name history - this could affect user setup!");
+			} else if(data == QUERY_UPDATE_USER) {
+				PrintToServer("[l4d2_stats_recorder] ERROR: Failed to update user info - this could prevent point recording!");
 			}
 		} else {
 			LogError("DBCT_Generic returned error: %s", error);
@@ -1261,6 +1286,20 @@ void DBCT_ReloadPoints(Handle db, Handle results, const char[] error, int userid
 		players[client].points = SQL_FetchInt(results, 0);
 		PrintToServer("[l4d2_stats_recorder] Fixed points for %N (%s): %d -> %d", 
 			client, players[client].steamid, oldPoints, players[client].points);
+	}
+}
+
+// Non-blocking callback for name history updates
+void DBCT_NameHistoryUpdate(Handle db, Handle child, const char[] error, int userid) {
+	if(db == null || child == null) {
+		// Log the error but DON'T affect core functionality
+		LogMessage("[l4d2_stats_recorder] Name history update failed (non-critical): %s", error);
+	} else {
+		// Success - name history updated for display purposes
+		int client = GetClientOfUserId(userid);
+		if(client > 0) {
+			PrintToServer("[l4d2_stats_recorder] Name history updated successfully for %N", client);
+		}
 	}
 }
 
@@ -2075,22 +2114,28 @@ public any Native_GetPoints(Handle plugin, int numParams) {
 	return players[client].points;
 }
 
-// Debug command to check player point status
+// Debug command to check player point status - STEAM ID FOCUSED
 public Action Command_CheckPlayerPoints(int client, int args) {
-	PrintToServer("[l4d2_stats_recorder] === Player Points Status Debug ===");
+	PrintToServer("[l4d2_stats_recorder] === Steam ID-Centric Point Recording Debug ===");
 	
 	for(int i = 1; i <= MaxClients; i++) {
 		if(IsClientInGame(i) && !IsFakeClient(i)) {
+			bool steamid_valid = (strlen(players[i].steamid) >= 8 && StrContains(players[i].steamid, "STEAM_") == 0);
+			char name_buffer[MAX_NAME_LENGTH];
+			GetClientName(i, name_buffer, sizeof(name_buffer));
+			
 			PrintToServer("[l4d2_stats_recorder] Player %N (ID:%d):", i, i);
-			PrintToServer("  - Team: %d", GetClientTeam(i));
-			PrintToServer("  - SteamID: '%s'", players[i].steamid);
-			PrintToServer("  - Points: %d", players[i].points);
-			PrintToServer("  - Queue size: %d", players[i].pointsQueue.Length);
-			PrintToServer("  - Minutes played: %d", (GetTime() - players[i].startedPlaying) / 60);
+			PrintToServer("  - ✅ SteamID: '%s' (Valid: %s)", players[i].steamid, steamid_valid ? "YES" : "NO");
+			PrintToServer("  - 📊 Points: %d (Queue: %d)", players[i].points, players[i].pointsQueue.Length);
+			PrintToServer("  - 👥 Team: %d", GetClientTeam(i));
+			PrintToServer("  - 🎮 Name: '%s' (Length: %d)", name_buffer, strlen(name_buffer));
+			PrintToServer("  - ⏱️ Minutes played: %d", (GetTime() - players[i].startedPlaying) / 60);
+			PrintToServer("  - 🔄 Ready for point recording: %s", steamid_valid ? "YES" : "NO");
+			PrintToServer("");
 		}
 	}
 	
-	PrintToServer("[l4d2_stats_recorder] === End Debug ===");
+	PrintToServer("[l4d2_stats_recorder] === End Steam ID Debug ===");
 	return Plugin_Handled;
 }
 
