@@ -11,29 +11,57 @@
         </div>
     </section>
     <br>
-    <div class="container is-fluid has-text-centered">
-        <h5 class="title is-5">Recently Played Games</h5>
+    <div class="container is-fluid">
+        <h5 class="title is-5 has-text-centered">Recently Played Games</h5>
         <div class="columns is-multiline">
-            <div v-for="campaign in recentCampaigns" class="column is-3" :key="campaign.campaignID">
-                <div class="box">
-                    <img class="is-inline-block is-pulled-left image is-128x128" :src="getMapImage(campaign.map)" />
-                    <h6 class="title is-6">{{campaign.map_name || campaign.map}}</h6>
-                    <p class="subtitle is-6"><span class="has-text-info">{{getGamemode(campaign.gamemode)}}</span> • <span class="has-text-info">{{formatDifficulty(campaign.difficulty)}}</span></p>
-                    <hr class="player-divider">
-                    <ul class="has-text-right">
-                        <li><b>{{getGameDuration((campaign.date_end-campaign.date_start))}}</b> long</li>
-                        <li><b>{{campaign.Deaths}}</b> deaths</li>
-                        <li><b>{{campaign.CommonsKilled | formatNumber}}</b> commons killed</li>
-                        <li><b>{{campaign.FF | formatNumber}}</b> friendly fire dealt</li>
-                    </ul>
-                    <br>
-                    <b-taglist v-if="campaign.server_tags">
-                        <b-tag v-for="tag in parseTags(campaign.server_tags)" :key="tag" :type="getTagType(tag)">
-                            {{tag}}
-                        </b-tag>
-                    </b-taglist>
-                    <span v-else><br><br></span>
-                    <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded>View Details</b-button>
+            <div v-for="campaign in recentCampaigns" class="column is-6-tablet is-4-desktop is-3-widescreen" :key="campaign.campaignID">
+                <div class="box" style="height: 100%; display: flex; flex-direction: column;">
+                    <div class="media">
+                        <div class="media-left">
+                            <figure class="image is-96x96">
+                                <img :src="getMapImage(campaign.map)" style="object-fit: cover; border-radius: 6px;" />
+                            </figure>
+                        </div>
+                        <div class="media-content">
+                            <h6 class="title is-6 mb-2">{{campaign.map_name || campaign.map}}</h6>
+                            <p class="subtitle is-7 mb-2">
+                                <span class="tag is-info is-light">{{getGamemode(campaign.gamemode)}}</span>
+                                <span class="tag is-info is-light">{{formatDifficulty(campaign.difficulty)}}</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="content is-small mt-3">
+                        <div class="columns is-mobile is-multiline">
+                            <div class="column is-6">
+                                <span class="has-text-weight-semibold">{{getGameDuration((campaign.date_end-campaign.date_start))}}</span>
+                                <br><span class="has-text-grey is-size-7">Duration</span>
+                            </div>
+                            <div class="column is-6">
+                                <span class="has-text-weight-semibold">{{campaign.Deaths}}</span>
+                                <br><span class="has-text-grey is-size-7">Deaths</span>
+                            </div>
+                            <div class="column is-6">
+                                <span class="has-text-weight-semibold">{{campaign.CommonsKilled | formatNumber}}</span>
+                                <br><span class="has-text-grey is-size-7">Commons</span>
+                            </div>
+                            <div class="column is-6">
+                                <span class="has-text-weight-semibold">{{campaign.FF | formatNumber}}</span>
+                                <br><span class="has-text-grey is-size-7">FF Damage</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto">
+                        <div v-if="campaign.server_tags" class="mb-3">
+                            <b-taglist>
+                                <b-tag v-for="tag in parseTags(campaign.server_tags)" :key="tag" :type="getTagType(tag)" size="is-small">
+                                    {{tag}}
+                                </b-tag>
+                            </b-taglist>
+                        </div>
+                        <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded size="is-small">View Details</b-button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -41,8 +69,8 @@
     <hr>
     <div class="container">
         <h5 class="title is-5">Search Played Campaigns</h5>
-        <span class="has-text-left">
-        <b-field grouped>
+        <div class="box">
+            <b-field grouped multiline>
             <b-field label="Tag Selection">
                 <!-- TODO: fetch from server -->
                 <b-select v-model="filtered.filters.tag" placeholder="Select a tag">
@@ -82,33 +110,59 @@
                 </b-select>
             </b-field>
         </b-field>
-        </span>
-        <hr>
+        </div>
         <div class="columns is-multiline">
-            <div v-for="campaign in filtered.list" class="column is-3" :key="campaign.campaignID">
-                <div class="box" style="height: 100%">
-                    <h4 class="title is-4">{{campaign.map_name ?? campaign.map}}</h4>
-                    <p class="subtitle is-6">
-                        <span class="has-text-info">{{getGamemode(campaign.gamemode)}}</span> • <span class="has-text-info">{{formatDifficulty(campaign.difficulty)}}</span>
-                        <br>Played <b>{{formatDate(campaign.date_end)}}</b>
-                    </p>
-                    <p class="subtitle is-6"></p>
-                    <hr class="player-divider">
-                    <ul class="has-text-left">
-                        <li><b>{{secondsToHms((campaign.date_end-campaign.date_start))}}</b> long</li>
-                        <li><b>{{campaign.Deaths}}</b> deaths</li>
-                        <li><b>{{campaign.CommonsKilled | formatNumber}}</b> commons killed</li>
-                        <li><b>{{campaign.FF | formatNumber}}</b> friendly fire dealt</li>
-                        <li><b>{{campaign.playerCount}}</b> players</li>
-                    </ul>
-                    <br>
-                    <b-taglist v-if="campaign.server_tags">
-                        <b-tag v-for="tag in parseTags(campaign.server_tags)" :key="tag" :type="getTagType(tag)">
-                            {{tag}}
-                        </b-tag>
-                    </b-taglist>
-                    <span v-else><br><br></span>
-                    <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded>View Details</b-button>
+            <div v-for="campaign in filtered.list" class="column is-6-tablet is-4-desktop is-3-widescreen" :key="campaign.campaignID">
+                <div class="box" style="height: 100%; display: flex; flex-direction: column;">
+                    <div class="media">
+                        <div class="media-left">
+                            <figure class="image is-96x96">
+                                <img :src="getMapImage(campaign.map)" style="object-fit: cover; border-radius: 6px;" />
+                            </figure>
+                        </div>
+                        <div class="media-content">
+                            <h6 class="title is-6 mb-2">{{campaign.map_name ?? campaign.map}}</h6>
+                            <p class="subtitle is-7 mb-2">
+                                <span class="tag is-info is-light">{{getGamemode(campaign.gamemode)}}</span>
+                                <span class="tag is-info is-light">{{formatDifficulty(campaign.difficulty)}}</span>
+                            </p>
+                            <p class="is-size-7 has-text-grey">
+                                Played <strong>{{formatDate(campaign.date_end)}}</strong>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="content is-small mt-3">
+                        <div class="columns is-mobile is-multiline">
+                            <div class="column is-6">
+                                <span class="has-text-weight-semibold">{{secondsToHms((campaign.date_end-campaign.date_start))}}</span>
+                                <br><span class="has-text-grey is-size-7">Duration</span>
+                            </div>
+                            <div class="column is-6">
+                                <span class="has-text-weight-semibold">{{campaign.Deaths}}</span>
+                                <br><span class="has-text-grey is-size-7">Deaths</span>
+                            </div>
+                            <div class="column is-6">
+                                <span class="has-text-weight-semibold">{{campaign.CommonsKilled | formatNumber}}</span>
+                                <br><span class="has-text-grey is-size-7">Commons</span>
+                            </div>
+                            <div class="column is-6">
+                                <span class="has-text-weight-semibold">{{campaign.playerCount}}</span>
+                                <br><span class="has-text-grey is-size-7">Players</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto">
+                        <div v-if="campaign.server_tags" class="mb-3">
+                            <b-taglist>
+                                <b-tag v-for="tag in parseTags(campaign.server_tags)" :key="tag" :type="getTagType(tag)" size="is-small">
+                                    {{tag}}
+                                </b-tag>
+                            </b-taglist>
+                        </div>
+                        <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded size="is-small">View Details</b-button>
+                    </div>
                 </div>
             </div>
         </div>

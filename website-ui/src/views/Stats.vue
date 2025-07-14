@@ -82,15 +82,15 @@
         </nav>
         <SummaryBit :values="averages" />
         <hr>
-        <div class="columns has-text-centered">
-            <div class="column">
+        <div v-if="hasMapData" class="columns has-text-centered">
+            <div v-if="averages.top_map" class="column">
                 <p class="title is-6">Most Played Official Map</p>
                 <figure class="image is-4by3">
                     <img :src="mostPlayedCampaignImage">
                 </figure>
                 <p class="is-family-sans-serif is-size-4">{{getMapName(averages.top_map)}}</p>
             </div>
-            <div class="column">
+            <div v-if="averages.least_map" class="column">
                 <p class="title is-6">Least Played Official Map</p>
                 <figure class="image is-4by3">
                     <img :src="leastPlayedCampaignImage">
@@ -98,10 +98,10 @@
                 <p class="is-family-sans-serif is-size-4">{{getMapName(averages.least_map)}}</p>
             </div>
         </div>
-        <span class='has-text-centered'>
+        <div v-if="mostPlayedDifficulty" class='has-text-centered'>
           <p><b>Most Played Difficulty:</b></p>
           <p>{{ mostPlayedDifficulty }}</p>
-        </span>
+        </div>
     </div>
     <br><br>
 </div>
@@ -130,8 +130,11 @@ export default {
         ]).finally(() => this.loading = false)
     },
     computed: {
+        hasMapData() {
+            return this.averages && (this.averages.top_map || this.averages.least_map);
+        },
         mostPlayedDifficulty() {
-            if(!this.averages) return null;
+            if(!this.averages || !this.averages.difficulty) return null;
             return GameInfo.difficulties[Number(this.averages.difficulty)]
         },
         mostPlayedCampaignImage() {
