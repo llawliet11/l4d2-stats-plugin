@@ -113,5 +113,41 @@ export default function(pool) {
             res.status(500).json({error:"Internal Server Error"})
         }
     })
+    
+    // Temporary debug endpoint
+    router.get('/debug/all-campaigns', async(req,res) => {
+        try {
+            const [campaigns] = await pool.execute(`
+                SELECT 
+                    campaignID, 
+                    COUNT(*) as sessions,
+                    COUNT(DISTINCT map) as maps,
+                    MIN(date_start) as first_start,
+                    MAX(date_end) as last_end,
+                    SUM(Deaths) as total_deaths,
+                    SUM(ZombieKills) as total_commons,
+                    gamemode,
+                    difficulty
+                FROM stats_games 
+                GROUP BY campaignID 
+                ORDER BY MIN(date_start) DESC
+            `);
+            
+            const [allSessions] = await pool.execute(`
+                SELECT campaignID, map, date_start, date_end, Deaths, ZombieKills, SurvivorDamage
+                FROM stats_games 
+                ORDER BY date_start DESC
+            `);
+            
+            res.json({
+                summary: campaigns,
+                allSessions: allSessions
+            })
+        } catch(err) {
+            console.error('[debug]', err.message);
+            res.status(500).json({error: err.message})
+        }
+    })
+    
     return router;
 }
