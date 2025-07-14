@@ -284,9 +284,9 @@ export default function(pool) {
                             [session.steamid, session.date_end, 0, points]
                         );
                         
-                        // Update user total (ensure non-negative due to unsigned column)
+                        // Update user total (allow negative points by removing GREATEST constraint)
                         await pool.execute(
-                            "UPDATE stats_users SET points = GREATEST(0, points + ?) WHERE steamid = ?",
+                            "UPDATE stats_users SET points = points + ? WHERE steamid = ?",
                             [points, session.steamid]
                         );
                         
