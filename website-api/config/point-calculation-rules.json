@@ -17,8 +17,8 @@
       "heal_teammate": 40,
       "heal_teammate_critical": 60,
       "revive_teammate": 25,
-      "defib_teammate": 50,
-      "teammate_save": 20,
+      "defib_teammate": 30,
+      "teammate_save": 10,
       "ammo_pack_deploy": 20,
       "finale_win": 1000
     },
