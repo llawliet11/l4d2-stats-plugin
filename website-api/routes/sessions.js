@@ -13,7 +13,7 @@ export default function(pool) {
             const pageNumber = (isNaN(selectedPage) || selectedPage <= 0) ? 0 : (parseInt(selectedPage) - 1);
             const offset = pageNumber * perPage;
             
-            // Get sessions with MVP calculation
+            // Get sessions for display - these are individual session records for the table
             const [rows] = await pool.query("SELECT `stats_games`.*,last_alias,points FROM `stats_games` INNER JOIN `stats_users` ON `stats_games`.steamid = `stats_users`.steamid order by `stats_games`.id desc LIMIT ?,?", [offset, perPage])
             const [total] = await pool.execute("SELECT COUNT(*)  AS total_sessions FROM `stats_games`");
             
@@ -47,39 +47,39 @@ export default function(pool) {
                 { field: "SurvivorDamage", direction: "asc" }
             ]
             
-            // Group sessions by campaignID and calculate MVP for each campaign
-            const campaignGroups = {};
-            rows.forEach(session => {
-                if (session.campaignID) {
-                    if (!campaignGroups[session.campaignID]) {
-                        campaignGroups[session.campaignID] = [];
-                    }
-                    campaignGroups[session.campaignID].push(session);
-                }
-            });
+            // Get unique campaigns from the current page sessions
+            const uniqueCampaigns = [...new Set(rows.filter(r => r.campaignID).map(r => r.campaignID))];
             
-            // Calculate MVP for each campaign
-            Object.keys(campaignGroups).forEach(campaignID => {
-                const campaignSessions = campaignGroups[campaignID];
+            // For each campaign, get aggregated user stats and determine MVP
+            const campaignMVPs = {};
+            
+            for (const campaignID of uniqueCampaigns) {
+                // Get aggregated stats for all users in this campaign
+                const orderBy = mvpCriteria.map(c => `${c.field} ${c.direction}`).join(', ');
+                const [campaignStats] = await pool.query(`
+                    SELECT 
+                        steamid,
+                        SUM(SpecialInfectedKills) as SpecialInfectedKills,
+                        SUM(SurvivorFFCount) as SurvivorFFCount, 
+                        SUM(ZombieKills) as ZombieKills,
+                        SUM(DamageTaken) as DamageTaken,
+                        SUM(SurvivorDamage) as SurvivorDamage
+                    FROM stats_games 
+                    WHERE campaignID = ? 
+                    GROUP BY steamid 
+                    ORDER BY ${orderBy}
+                `, [campaignID]);
                 
-                // Sort sessions by MVP criteria
-                campaignSessions.sort((a, b) => {
-                    for (const criterion of mvpCriteria) {
-                        const fieldA = a[criterion.field] || 0;
-                        const fieldB = b[criterion.field] || 0;
-                        
-                        if (criterion.direction === 'desc') {
-                            if (fieldB !== fieldA) return fieldB - fieldA;
-                        } else {
-                            if (fieldA !== fieldB) return fieldA - fieldB;
-                        }
-                    }
-                    return 0;
-                });
-                
-                // Mark the first session (MVP) in each campaign
-                if (campaignSessions.length > 0) {
-                    campaignSessions[0].isMVP = true;
+                // The first user in the sorted result is the MVP for this campaign
+                if (campaignStats.length > 0) {
+                    campaignMVPs[campaignID] = campaignStats[0].steamid;
+                }
+            }
+            
+            // Mark sessions where the user is MVP for their campaign
+            rows.forEach(session => {
+                if (session.campaignID && campaignMVPs[session.campaignID] === session.steamid) {
+                    session.isMVP = true;
                 }
             });
             
