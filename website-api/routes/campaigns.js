@@ -12,7 +12,7 @@ export default function(pool) {
     router.get('/:id', routeCache.cacheSeconds(120), async(req,res) => {
         try {
             const [rows] = await pool.query(
-                "SELECT `stats_games`.*, last_alias, points, i.name as map_name FROM `stats_games` INNER JOIN `stats_users` ON `stats_games`.steamid = `stats_users`.steamid INNER JOIN map_info i ON i.mapid = stats_games.map WHERE left(`stats_games`.campaignID, 8) = ? ORDER BY SpecialInfectedKills desc, SurvivorDamage asc, ZombieKills desc, DamageTaken asc", 
+                "SELECT `stats_games`.*, last_alias, points, i.name as map_name FROM `stats_games` INNER JOIN `stats_users` ON `stats_games`.steamid = `stats_users`.steamid INNER JOIN map_info i ON i.mapid = stats_games.map WHERE left(`stats_games`.campaignID, 8) = ? ORDER BY SpecialInfectedKills desc, SurvivorFFCount asc, ZombieKills desc, DamageTaken asc, SurvivorDamage asc", 
                 [req.params.id.substring(0,8)]
             )
             res.json(rows)
