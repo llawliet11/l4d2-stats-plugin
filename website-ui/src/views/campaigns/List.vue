@@ -13,75 +13,6 @@
     <br>
     <section class="section">
         <div class="container">
-            <h2 class="title is-4 has-text-centered mb-6">Recently Played Games</h2>
-            <div class="columns is-multiline">
-                <div v-for="campaign in recentCampaigns" class="column is-6-tablet is-4-desktop is-3-widescreen" :key="campaign.campaignID">
-                    <div class="box" style="height: 100%;">
-                        <div class="media">
-                            <div class="media-left">
-                                <figure class="image is-64x64">
-                                    <img :src="getMapImage(campaign.map)" style="object-fit: cover; border-radius: 4px;" />
-                                </figure>
-                            </div>
-                            <div class="media-content">
-                                <p class="title is-6">{{campaign.map_name || campaign.map}}</p>
-                                <p class="subtitle is-7">
-                                    <span class="tag is-info is-small">{{getGamemode(campaign.gamemode)}}</span>
-                                    <span class="tag is-warning is-small">{{formatDifficulty(campaign.difficulty)}}</span>
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="content">
-                            <div class="level is-mobile">
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Duration</p>
-                                        <p class="title is-6">{{getGameDuration((campaign.date_end-campaign.date_start))}}</p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Deaths</p>
-                                        <p class="title is-6">{{campaign.Deaths}}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="level is-mobile">
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Commons</p>
-                                        <p class="title is-6">{{campaign.CommonsKilled | formatNumber}}</p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">FF Damage</p>
-                                        <p class="title is-6">{{campaign.FF | formatNumber}}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div v-if="campaign.server_tags" class="mb-3">
-                                <b-taglist>
-                                    <b-tag v-for="tag in parseTags(campaign.server_tags)" :key="tag" :type="getTagType(tag)" size="is-small">
-                                        {{tag}}
-                                    </b-tag>
-                                </b-taglist>
-                            </div>
-
-                            <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded size="is-small">
-                                View Details
-                            </b-button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-    <section class="section">
-        <div class="container">
             <h2 class="title is-4 has-text-centered mb-6">Search Played Campaigns</h2>
         <div class="box">
             <b-field grouped multiline>
@@ -125,55 +56,99 @@
             </b-field>
         </b-field>
         </div>
+            <div class="table-container">
+                <table class="table is-fullwidth is-striped is-hoverable">
+                    <thead>
+                        <tr>
+                            <th>Map</th>
+                            <th>Mode</th>
+                            <th>Difficulty</th>
+                            <th>Date Played</th>
+                            <th>Duration</th>
+                            <th>Deaths</th>
+                            <th>Commons</th>
+                            <th>Players</th>
+                            <th>Tags</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="campaign in filtered.list" :key="campaign.campaignID">
+                            <td>
+                                <strong>{{campaign.map_name ?? campaign.map}}</strong>
+                            </td>
+                            <td>
+                                <span class="tag is-info is-small">{{getGamemode(campaign.gamemode)}}</span>
+                            </td>
+                            <td>
+                                <span class="tag is-warning is-small">{{formatDifficulty(campaign.difficulty)}}</span>
+                            </td>
+                            <td>
+                                <span class="is-size-7">{{formatDate(campaign.date_end)}}</span>
+                            </td>
+                            <td>
+                                <strong>{{secondsToHms((campaign.date_end-campaign.date_start))}}</strong>
+                            </td>
+                            <td>
+                                <strong>{{campaign.Deaths}}</strong>
+                            </td>
+                            <td>
+                                <strong>{{campaign.CommonsKilled | formatNumber}}</strong>
+                            </td>
+                            <td>
+                                <strong>{{campaign.playerCount}}</strong>
+                            </td>
+                            <td>
+                                <b-taglist v-if="campaign.server_tags">
+                                    <b-tag v-for="tag in parseTags(campaign.server_tags)" :key="tag" :type="getTagType(tag)" size="is-small">
+                                        {{tag}}
+                                    </b-tag>
+                                </b-taglist>
+                                <span v-else class="has-text-grey">-</span>
+                            </td>
+                            <td>
+                                <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" size="is-small">
+                                    View Details
+                                </b-button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2 class="title is-4 has-text-centered mb-6">Recently Played Games</h2>
             <div class="columns is-multiline">
-                <div v-for="campaign in filtered.list" class="column is-6-tablet is-4-desktop is-3-widescreen" :key="campaign.campaignID">
+                <div v-for="campaign in recentCampaigns" class="column is-6-tablet is-4-desktop" :key="campaign.campaignID">
                     <div class="box" style="height: 100%;">
-                        <div class="media">
-                            <div class="media-left">
-                                <figure class="image is-64x64">
-                                    <img :src="getMapImage(campaign.map)" style="object-fit: cover; border-radius: 4px;" />
-                                </figure>
-                            </div>
-                            <div class="media-content">
-                                <p class="title is-6">{{campaign.map_name ?? campaign.map}}</p>
-                                <p class="subtitle is-7">
-                                    <span class="tag is-info is-small">{{getGamemode(campaign.gamemode)}}</span>
-                                    <span class="tag is-warning is-small">{{formatDifficulty(campaign.difficulty)}}</span>
-                                </p>
-                                <p class="is-size-7 has-text-grey">
-                                    Played <strong>{{formatDate(campaign.date_end)}}</strong>
-                                </p>
+                        <div class="content">
+                            <h5 class="title is-5 mb-3">{{campaign.map_name || campaign.map}}</h5>
+                            <div class="tags mb-4">
+                                <span class="tag is-info">{{getGamemode(campaign.gamemode)}}</span>
+                                <span class="tag is-warning">{{formatDifficulty(campaign.difficulty)}}</span>
                             </div>
                         </div>
 
                         <div class="content">
-                            <div class="level is-mobile">
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Duration</p>
-                                        <p class="title is-6">{{secondsToHms((campaign.date_end-campaign.date_start))}}</p>
-                                    </div>
+                            <div class="columns is-mobile is-multiline">
+                                <div class="column is-6 has-text-centered">
+                                    <p class="heading">Duration</p>
+                                    <p class="title is-5">{{getGameDuration((campaign.date_end-campaign.date_start))}}</p>
                                 </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Deaths</p>
-                                        <p class="title is-6">{{campaign.Deaths}}</p>
-                                    </div>
+                                <div class="column is-6 has-text-centered">
+                                    <p class="heading">Deaths</p>
+                                    <p class="title is-5">{{campaign.Deaths}}</p>
                                 </div>
-                            </div>
-
-                            <div class="level is-mobile">
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Commons</p>
-                                        <p class="title is-6">{{campaign.CommonsKilled | formatNumber}}</p>
-                                    </div>
+                                <div class="column is-6 has-text-centered">
+                                    <p class="heading">Commons</p>
+                                    <p class="title is-5">{{campaign.CommonsKilled | formatNumber}}</p>
                                 </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Players</p>
-                                        <p class="title is-6">{{campaign.playerCount}}</p>
-                                    </div>
+                                <div class="column is-6 has-text-centered">
+                                    <p class="heading">FF Damage</p>
+                                    <p class="title is-5">{{campaign.FF | formatNumber}}</p>
                                 </div>
                             </div>
 
@@ -229,6 +204,7 @@ export default {
         document.title = `Campaigns - L4D2 Stats Plugin`
         this.fetchGamemodes()
         this.fetchCampaigns()
+        this.fetchFilteredCampaigns()
     },
     watch: {
         "filtered.filters": {
