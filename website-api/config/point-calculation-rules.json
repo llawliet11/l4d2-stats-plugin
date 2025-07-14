@@ -24,7 +24,7 @@
     },
     
     "penalties": {
-      "friendly_fire_per_damage": -10,
+      "friendly_fire_per_damage": -2,
       "teammate_kill": -500
     }
   },
