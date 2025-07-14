@@ -50,8 +50,7 @@
                             <li><span class="has-text-danger">-500</span> for teammate kill</li>
                             <li><span class="has-text-danger">-40</span> per damage point dealt to teammate</li>
                         </ul>
-                        <br>
-                        <p><strong>Tank Kill Points:</strong> When a tank is killed, the 100 points are distributed among all players who participated in the current game session based on their damage contribution. For example, if 4 players fight a tank and deal 50%, 30%, 15%, and 5% damage respectively, they receive 50, 30, 15, and 5 points. Solo and melee bonuses are awarded only to the player who delivers the killing blow.</p>
+
                         <br>
                         <p><strong>Healing Anti-Abuse System:</strong> To prevent point farming, healing points are only awarded when:</p>
                         <ul>
@@ -60,6 +59,9 @@
                             <li>Critical heals (≤30% health) award bonus points (+60 instead of +40)</li>
                             <li>Cooldown persists through team wipes and map restarts</li>
                         </ul>
+
+                      <br>
+                      <p><strong>Tank Kill Points:</strong> When a tank is killed, the 100 points are distributed among all players who participated in the current game session based on their damage contribution. For example, if 4 players fight a tank and deal 50%, 30%, 15%, and 5% damage respectively, they receive 50, 30, 15, and 5 points. Solo and melee bonuses are awarded only to the player who delivers the killing blow.</p>
                     </div>
                 </div>
             </b-collapse>
@@ -97,3 +99,5 @@
     <br>
 </div>
 </template>
+<script setup lang="ts">
+</script>
