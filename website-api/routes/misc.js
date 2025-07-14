@@ -168,5 +168,137 @@ export default function(pool) {
         }
     })
 
+    // Recalculate all user points based on current rules
+    router.post('/recalculate', async(req,res) => {
+        try {
+            console.log('[/api/recalculate] Starting point recalculation...');
+            
+            // Clear existing points
+            await pool.execute("DELETE FROM stats_points");
+            console.log('[/api/recalculate] Cleared existing points');
+            
+            // Reset user points to 0
+            await pool.execute("UPDATE stats_users SET points = 0");
+            console.log('[/api/recalculate] Reset user points to 0');
+            
+            // Get all game sessions ordered by date
+            const [sessions] = await pool.execute(`
+                SELECT * FROM stats_games 
+                WHERE date_end > 0 AND date_start > 0 
+                ORDER BY date_end ASC
+            `);
+            
+            console.log(`[/api/recalculate] Processing ${sessions.length} sessions...`);
+            
+            let processedCount = 0;
+            const batchSize = 100;
+            
+            for (let i = 0; i < sessions.length; i += batchSize) {
+                const batch = sessions.slice(i, i + batchSize);
+                
+                for (const session of batch) {
+                    // Calculate points for this session based on current rules
+                    let points = 0;
+                    
+                    // Common infected kills
+                    points += (session.ZombieKills || 0) * 1;
+                    
+                    // Headshots (assuming we track this somehow, if not skip)
+                    // points += (session.HeadshotKills || 0) * 2;
+                    
+                    // Special infected kills
+                    points += (session.SpecialInfectedKills || 0) * 6;
+                    
+                    // Tank kills (distributed damage-based, for now just give participation)
+                    if (session.DamageToTank && session.DamageToTank > 0) {
+                        points += Math.min(100, Math.floor(session.DamageToTank / 100)); // Rough approximation
+                    }
+                    
+                    // Witch kills
+                    points += (session.WitchesCrowned || 0) * 15;
+                    
+                    // Heal teammates - using MedkitsUsed and FirstAidShared as proxy
+                    points += ((session.MedkitsUsed || 0) + (session.FirstAidShared || 0)) * 40;
+                    
+                    // Revive teammates
+                    points += (session.ReviveOtherCount || 0) * 25;
+                    
+                    // Defib teammates
+                    points += (session.DefibrillatorsUsed || 0) * 50;
+                    
+                    // Teammate saves (rough estimate from special kills that might be saves)
+                    points += Math.floor((session.SpecialInfectedKills || 0) * 0.3) * 20;
+                    
+                    // Ammo packs (if tracked, otherwise skip)
+                    // points += (session.AmmoPacksUsed || 0) * 20;
+                    
+                    // Finale wins (check if this is a finale map)
+                    if (session.finale_time && session.finale_time > 0) {
+                        points += 1000;
+                    }
+                    
+                    // Penalties
+                    // Teammate kills (if tracked)
+                    // points -= (session.TeammateKills || 0) * 500;
+                    
+                    // Friendly fire damage
+                    points -= (session.SurvivorDamage || 0) * 40;
+                    
+                    // Ensure points don't go negative for individual sessions
+                    points = Math.max(0, points);
+                    
+                    if (points > 0) {
+                        // Insert point record
+                        await pool.execute(
+                            "INSERT INTO stats_points (steamid, timestamp, type, amount) VALUES (?, ?, 'recalc_session', ?)",
+                            [session.steamid, session.date_end, points]
+                        );
+                        
+                        // Update user total
+                        await pool.execute(
+                            "UPDATE stats_users SET points = points + ? WHERE steamid = ?",
+                            [points, session.steamid]
+                        );
+                    }
+                    
+                    processedCount++;
+                }
+                
+                // Log progress every batch
+                console.log(`[/api/recalculate] Processed ${Math.min(i + batchSize, sessions.length)}/${sessions.length} sessions`);
+            }
+            
+            // Get final stats
+            const [finalStats] = await pool.execute(`
+                SELECT 
+                    COUNT(*) as total_users,
+                    SUM(points) as total_points,
+                    AVG(points) as avg_points,
+                    MAX(points) as max_points
+                FROM stats_users 
+                WHERE points > 0
+            `);
+            
+            console.log('[/api/recalculate] Recalculation completed successfully');
+            
+            res.json({
+                success: true,
+                message: 'Points recalculated successfully',
+                stats: {
+                    sessions_processed: processedCount,
+                    ...finalStats[0]
+                }
+            });
+            
+        } catch(err) {
+            console.error('[/api/recalculate]', err.message);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to recalculate points',
+                message: err.message
+            });
+        }
+    });
+
     return router;
 }

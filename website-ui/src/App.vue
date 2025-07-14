@@ -32,6 +32,17 @@
 
         <template slot="end">
             <b-navbar-item>
+              <b-button 
+                type="is-warning" 
+                size="is-small" 
+                @click="recalculatePoints"
+                :loading="recalculating"
+                icon-left="refresh"
+              >
+                Recalculate
+              </b-button>
+            </b-navbar-item>
+            <b-navbar-item>
               <form @submit.prevent="searchUser">
               <b-field>
                   <b-autocomplete
@@ -85,6 +96,7 @@ export default {
         autocomplete: [],
         loading: false
       },
+      recalculating: false
     }
   },
   methods: {
@@ -114,6 +126,44 @@ export default {
     onSearchSelect(obj) {
       if(obj) {
         this.$router.push('/user/' + obj.steamid)
+      }
+    },
+    recalculatePoints() {
+      this.$buefy.dialog.confirm({
+        title: 'Recalculate Points',
+        message: 'This will recalculate all user points based on the current scoring rules. This process may take several minutes and will clear existing point history. Are you sure you want to continue?',
+        confirmText: 'Recalculate',
+        type: 'is-warning',
+        hasIcon: true,
+        onConfirm: () => this.performRecalculation()
+      })
+    },
+    async performRecalculation() {
+      this.recalculating = true
+      try {
+        const response = await this.$http.post('/api/recalculate')
+        
+        if (response.data.success) {
+          this.$buefy.toast.open({
+            duration: 5000,
+            message: `Points recalculated successfully! Processed ${response.data.stats.sessions_processed} sessions. Total points: ${response.data.stats.total_points}`,
+            type: 'is-success'
+          })
+          
+          // Force refresh current page to show updated points
+          this.$router.go(0)
+        } else {
+          throw new Error(response.data.message || 'Recalculation failed')
+        }
+      } catch (error) {
+        console.error('Recalculation error:', error)
+        this.$buefy.toast.open({
+          duration: 8000,
+          message: `Failed to recalculate points: ${error.response?.data?.message || error.message}`,
+          type: 'is-danger'
+        })
+      } finally {
+        this.recalculating = false
       }
     }
   }
