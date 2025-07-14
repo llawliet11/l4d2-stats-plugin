@@ -67,7 +67,7 @@ export default function(pool) {
 
             const difficulty         = isNaN(req.query.difficulty) ? null : parseInt(req.query.difficulty)
             let selectTag            = req.query.tag
-            if(!selectTag || selectTag === "any") selectTag = calculationRules.defaults?.server_tag_default || "prod"
+            if(!selectTag) selectTag = "any"
             let gamemodeSearchString = req.query.gamemode && req.query.gamemode !== "all" ? `${req.query.gamemode}` : calculationRules.defaults?.gamemode_search_all || `%`
             let mapSearchString      = "" // RLIKE "^c[0-9]m"
             if(req.query.type) {
@@ -90,11 +90,11 @@ export default function(pool) {
                     SUM(MedkitsUsed), 
                     (SUM(MolotovsUsed) + SUM(PipebombsUsed) + SUM(BoomerBilesUsed)) as ThrowableTotal, 
                     server_tags,
-                    i.name as map_name
+                    COALESCE(i.name, g.map) as map_name
                 FROM \`stats_games\` as g 
                 INNER JOIN \`stats_users\` ON g.steamid = \`stats_users\`.steamid 
-                INNER JOIN map_info i ON i.mapid = g.map
-                WHERE (? = 'any' OR server_tags IS NULL OR FIND_IN_SET(?, server_tags)) ${mapSearchString} AND gamemode LIKE ? AND (? IS NULL OR difficulty = ?)
+                LEFT JOIN map_info i ON i.mapid = g.map
+                WHERE (? = 'any' OR server_tags IS NULL OR server_tags = '' OR FIND_IN_SET(?, server_tags)) ${mapSearchString} AND gamemode LIKE ? AND (? IS NULL OR difficulty = ?)
                 GROUP BY g.campaignID 
                 ORDER BY date_end DESC LIMIT ?, ?`, 
             [selectTag, selectTag, gamemodeSearchString, difficulty, difficulty, offset, perPage])
