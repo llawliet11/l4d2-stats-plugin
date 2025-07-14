@@ -4,15 +4,15 @@
         <div class="hero-body">
             <div class="container has-text-centered">
             <h1 class="title">
-                Sessions
+                Player Statistics
             </h1>
-            <p class="subtitle is-4"><b>{{total_sessions | formatNumber}}</b> total games played</p>
+            <p class="subtitle is-4"><b>{{total_sessions | formatNumber}}</b> active players</p>
             </div>
         </div>
     </section>
     <br>
     <div class="container is-fluid">
-        <h5 class="title is-5">Sorted by Most Recent</h5>
+        <h5 class="title is-5">Sorted by Points (Overall MVP determined by criteria below)</h5>
         <b-table
             :data="sessions"
             :loading="loading"
@@ -27,7 +27,7 @@
         >
         <!-- TODO: background sort -->
                 <b-table-column v-slot="props" label="View">
-                    <b-button tag="router-link" :to="'/sessions/details/' + props.row.id" expanded  :style="'background-color:' + getRGB(props.row.campaignID)"> View</b-button>
+                    <b-button tag="router-link" :to="'/user/' + props.row.steamid" expanded type="is-info"> View Profile</b-button>
                 </b-table-column>
                 <b-table-column v-slot="props" field="steamid" label="User">
                     <router-link :to='"/user/" + props.row.steamid'>

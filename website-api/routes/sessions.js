@@ -13,11 +13,32 @@ export default function(pool) {
             const pageNumber = (isNaN(selectedPage) || selectedPage <= 0) ? 0 : (parseInt(selectedPage) - 1);
             const offset = pageNumber * perPage;
             
-            // Get sessions for display - these are individual session records for the table
-            const [rows] = await pool.query("SELECT `stats_games`.*,last_alias,points FROM `stats_games` INNER JOIN `stats_users` ON `stats_games`.steamid = `stats_users`.steamid order by `stats_games`.id desc LIMIT ?,?", [offset, perPage])
-            const [total] = await pool.execute("SELECT COUNT(*)  AS total_sessions FROM `stats_games`");
+            // Get user aggregated stats instead of individual sessions
+            const [rows] = await pool.query(`
+                SELECT 
+                    u.steamid,
+                    u.last_alias,
+                    u.points,
+                    u.survivor_deaths as Deaths,
+                    u.survivor_incaps as Incaps,
+                    u.survivor_ff as SurvivorDamage,
+                    u.survivor_damage_rec as DamageTaken,
+                    u.common_kills as ZombieKills,
+                    (u.kills_smoker + u.kills_boomer + u.kills_hunter + u.kills_spitter + u.kills_jockey + u.kills_charger) as SpecialInfectedKills,
+                    u.heal_others as MedkitsUsed,
+                    (u.throws_molotov + u.throws_pipe + u.throws_puke) as TotalThrowables,
+                    (u.pills_used + u.adrenaline_used) as TotalPillsShots,
+                    'N/A' as map,
+                    'Overall' as difficulty
+                FROM stats_users u
+                WHERE u.points > 0
+                ORDER BY u.points DESC
+                LIMIT ?,?
+            `, [offset, perPage]);
             
-            // Load MVP calculation rules
+            const [total] = await pool.execute("SELECT COUNT(*) AS total_sessions FROM stats_users WHERE points > 0");
+            
+            // Load MVP calculation rules for overall MVP
             let calculationRules;
             try {
                 const rulesPath = path.join(process.cwd(), 'config', 'calculation-rules.json');
@@ -38,50 +59,45 @@ export default function(pool) {
                 };
             }
 
-            // Build MVP sorting criteria from config
+            // Calculate friendly fire count from damage (approximate)
+            rows.forEach(row => {
+                // Estimate FF count from FF damage (assuming average 10 damage per FF incident)
+                row.SurvivorFFCount = Math.round((row.SurvivorDamage || 0) / 10);
+            });
+
+            // Build MVP sorting criteria
             const mvpCriteria = calculationRules.mvp_calculation?.criteria || [
                 { field: "SpecialInfectedKills", direction: "desc" },
                 { field: "SurvivorFFCount", direction: "asc" },
                 { field: "ZombieKills", direction: "desc" },
                 { field: "DamageTaken", direction: "asc" },
                 { field: "SurvivorDamage", direction: "asc" }
-            ]
+            ];
             
-            // Get unique campaigns from the current page sessions
-            const uniqueCampaigns = [...new Set(rows.filter(r => r.campaignID).map(r => r.campaignID))];
-            
-            // For each campaign, get aggregated user stats and determine MVP
-            const campaignMVPs = {};
-            
-            for (const campaignID of uniqueCampaigns) {
-                // Get aggregated stats for all users in this campaign
-                const orderBy = mvpCriteria.map(c => `${c.field} ${c.direction}`).join(', ');
-                const [campaignStats] = await pool.query(`
-                    SELECT 
-                        steamid,
-                        SUM(SpecialInfectedKills) as SpecialInfectedKills,
-                        SUM(SurvivorFFCount) as SurvivorFFCount, 
-                        SUM(ZombieKills) as ZombieKills,
-                        SUM(DamageTaken) as DamageTaken,
-                        SUM(SurvivorDamage) as SurvivorDamage
-                    FROM stats_games 
-                    WHERE campaignID = ? 
-                    GROUP BY steamid 
-                    ORDER BY ${orderBy}
-                `, [campaignID]);
-                
-                // The first user in the sorted result is the MVP for this campaign
-                if (campaignStats.length > 0) {
-                    campaignMVPs[campaignID] = campaignStats[0].steamid;
+            // Sort users by MVP criteria to determine overall MVP
+            const sortedUsers = [...rows].sort((a, b) => {
+                for (const criterion of mvpCriteria) {
+                    const fieldA = a[criterion.field] || 0;
+                    const fieldB = b[criterion.field] || 0;
+                    
+                    if (criterion.direction === 'desc') {
+                        if (fieldB !== fieldA) return fieldB - fieldA;
+                    } else {
+                        if (fieldA !== fieldB) return fieldA - fieldB;
+                    }
                 }
-            }
-            
-            // Mark sessions where the user is MVP for their campaign
-            rows.forEach(session => {
-                if (session.campaignID && campaignMVPs[session.campaignID] === session.steamid) {
-                    session.isMVP = true;
-                }
+                return 0;
             });
+            
+            // Mark the overall MVP (first in sorted list)
+            if (sortedUsers.length > 0) {
+                const mvpSteamId = sortedUsers[0].steamid;
+                rows.forEach(row => {
+                    if (row.steamid === mvpSteamId) {
+                        row.isMVP = true;
+                    }
+                });
+            }
             
             return res.json({
                 sessions: rows,
