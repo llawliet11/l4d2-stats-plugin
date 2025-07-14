@@ -257,7 +257,7 @@ export default {
       mvpTooltipText() {
         return `MVP is determined by the following criteria (in order):
 1. Special Infected Killed (highest)
-2. Survivor FF Count (lowest)  
+2. Friendly fired (lowest)  
 3. Zombie Kills (highest)
 4. Damage Taken (lowest)
 5. Friendly Fire (lowest)`
