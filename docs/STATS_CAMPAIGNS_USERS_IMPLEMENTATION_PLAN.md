@@ -18,10 +18,27 @@ Create `stats_map_users` table that combines the accuracy of `stats_users` with 
 
 #### 1.1 Create stats_map_users Table
 ```sql
--- Create table based on stats_users structure
+-- Create table with ALL columns from stats_users structure
 CREATE TABLE stats_map_users LIKE stats_users;
 
--- Add map-specific columns
+-- IMPORTANT: stats_map_users inherits ALL columns from stats_users:
+-- steamid, last_alias, last_join_date, created_date, connections, country, points,
+-- survivor_deaths, infected_deaths, survivor_damage_rec, survivor_damage_give,
+-- infected_damage_rec, infected_damage_give, pickups_molotov, pickups_pipe_bomb,
+-- survivor_incaps, pills_used, defibs_used, adrenaline_used, heal_self, heal_others,
+-- revived, revived_others, pickups_pain_pills, melee_kills, tanks_killed,
+-- tanks_killed_solo, tanks_killed_melee, survivor_ff, survivor_ff_rec, common_kills,
+-- common_headshots, door_opens, damage_to_tank, damage_as_tank, damage_witch,
+-- minutes_played, finales_won, kills_smoker, kills_boomer, kills_hunter,
+-- kills_spitter, kills_jockey, kills_charger, kills_witch, packs_used, ff_kills,
+-- throws_puke, throws_molotov, throws_pipe, damage_molotov, kills_molotov,
+-- kills_pipe, kills_minigun, kills_all_specials, caralarms_activated,
+-- witches_crowned, witches_crowned_angry, smokers_selfcleared, rocks_hitby,
+-- hunters_deadstopped, cleared_pinned, times_pinned, clowns_honked, minutes_idle,
+-- boomer_mellos, boomer_mellos_self, forgot_kit_count, total_distance_travelled,
+-- mvp_wins, ff_damage_received
+
+-- Add map-specific additional columns
 ALTER TABLE stats_map_users ADD COLUMN mapid varchar(32) NOT NULL;
 ALTER TABLE stats_map_users ADD COLUMN session_start bigint(20) unsigned NOT NULL;
 ALTER TABLE stats_map_users ADD COLUMN session_end bigint(20) unsigned DEFAULT NULL;
@@ -43,10 +60,32 @@ ALTER TABLE stats_map_users ADD CONSTRAINT fk_map_users_mapid
 #### 1.2 Data Migration for Current Map
 ```sql
 -- Migrate existing data from stats_users to stats_map_users
+-- This preserves ALL existing stats_users data and adds map-specific columns
 -- For the single current map (requiem_05)
-INSERT INTO stats_map_users 
+INSERT INTO stats_map_users (
+    -- ALL stats_users columns (inherited via CREATE TABLE LIKE)
+    steamid, last_alias, last_join_date, created_date, connections, country, points,
+    survivor_deaths, infected_deaths, survivor_damage_rec, survivor_damage_give,
+    infected_damage_rec, infected_damage_give, pickups_molotov, pickups_pipe_bomb,
+    survivor_incaps, pills_used, defibs_used, adrenaline_used, heal_self, heal_others,
+    revived, revived_others, pickups_pain_pills, melee_kills, tanks_killed,
+    tanks_killed_solo, tanks_killed_melee, survivor_ff, survivor_ff_rec, common_kills,
+    common_headshots, door_opens, damage_to_tank, damage_as_tank, damage_witch,
+    minutes_played, finales_won, kills_smoker, kills_boomer, kills_hunter,
+    kills_spitter, kills_jockey, kills_charger, kills_witch, packs_used, ff_kills,
+    throws_puke, throws_molotov, throws_pipe, damage_molotov, kills_molotov,
+    kills_pipe, kills_minigun, kills_all_specials, caralarms_activated,
+    witches_crowned, witches_crowned_angry, smokers_selfcleared, rocks_hitby,
+    hunters_deadstopped, cleared_pinned, times_pinned, clowns_honked, minutes_idle,
+    boomer_mellos, boomer_mellos_self, forgot_kit_count, total_distance_travelled,
+    mvp_wins, ff_damage_received,
+    -- Additional map-specific columns
+    mapid, session_start, session_end
+)
 SELECT 
+    -- ALL stats_users data
     u.*,
+    -- Additional map-specific data
     'requiem_05' as mapid,
     (SELECT MIN(date_start) FROM stats_games WHERE steamid = u.steamid) as session_start,
     (SELECT MAX(date_end) FROM stats_games WHERE steamid = u.steamid) as session_end
