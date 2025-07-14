@@ -180,7 +180,7 @@
                 </tr>
                 <tr>
                     <td>Friendly Fire Received</td>
-                    <td class="tvalue">{{user.survivor_ff_recv | formatNumber}}</td>
+                    <td class="tvalue">{{user.survivor_ff_rec | formatNumber}}</td>
                 </tr>
                 <tr>
                     <td>With Melee</td>
