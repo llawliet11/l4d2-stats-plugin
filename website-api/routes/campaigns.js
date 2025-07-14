@@ -94,10 +94,10 @@ export default function(pool) {
                 FROM \`stats_games\` as g 
                 INNER JOIN \`stats_users\` ON g.steamid = \`stats_users\`.steamid 
                 INNER JOIN map_info i ON i.mapid = g.map
-                WHERE FIND_IN_SET(?, server_tags) ${mapSearchString} AND gamemode LIKE ? AND ? IS NULL OR difficulty = ?
+                WHERE (? = 'any' OR server_tags IS NULL OR FIND_IN_SET(?, server_tags)) ${mapSearchString} AND gamemode LIKE ? AND (? IS NULL OR difficulty = ?)
                 GROUP BY g.campaignID 
                 ORDER BY date_end DESC LIMIT ?, ?`, 
-            [selectTag, gamemodeSearchString, difficulty, difficulty, offset, perPage])
+            [selectTag, selectTag, gamemodeSearchString, difficulty, difficulty, offset, perPage])
             res.json({
                 meta: {
                     selectTag,
