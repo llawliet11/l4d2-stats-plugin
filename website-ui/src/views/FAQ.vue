@@ -32,23 +32,31 @@
                 </div>
                 <div class="card-content">
                     <div class="content">
-                        <ul>
-                            <li><span class="has-text-success">+1</span> per common killed (any damage type)</li>
-                            <li><span class="has-text-success">+2</span> per common headshot</li>
-                            <li><span class="has-text-success">+6</span> per special kill</li>
-                            <li><span class="has-text-success">+100</span> per tank kill <em>(total points distributed among all players in the session based on damage dealt)</em></li>
-                            <li><span class="has-text-success">+20</span> per tank kill solo <em>(bonus for killer only)</em></li>
-                            <li><span class="has-text-success">+50</span> per tank kill melee <em>(bonus for killer only)</em></li>
-                            <li><span class="has-text-success">+15</span> per witch kill</li>
-                            <li><span class="has-text-success">+40</span> per heal teammate <em>(+60 if target ≤30% health)</em></li>
-                            <li><span class="has-text-success">+25</span> per revive teammate</li>
-                            <li><span class="has-text-success">+50</span> per teammate defibbed</li>
-                            <li><span class="has-text-success">+20</span> per teammate save from specials</li>
-                            <li><span class="has-text-success">+20</span> per ammo pack deploy</li>
-                            <li><span class="has-text-success">+1000</span> per finale win</li>
+                        <div v-if="loadingRules" class="has-text-centered">
+                            <b-loading :is-full-page="false" v-model="loadingRules"></b-loading>
+                            <p>Loading point calculation rules...</p>
+                        </div>
+                        <div v-else-if="rulesError" class="notification is-warning">
+                            <p><strong>Warning:</strong> Could not load current point rules from server. Displaying fallback values.</p>
+                            <p><em>{{ rulesError }}</em></p>
+                        </div>
+                        <ul v-if="!loadingRules">
+                            <li><span class="has-text-success">+{{ positiveActions.common_kill || 1 }}</span> per common killed (any damage type)</li>
+                            <li><span class="has-text-success">+{{ positiveActions.headshot || 2 }}</span> per common headshot</li>
+                            <li><span class="has-text-success">+{{ positiveActions.special_kill || 6 }}</span> per special kill</li>
+                            <li><span class="has-text-success">+{{ positiveActions.tank_kill_max || 100 }}</span> per tank kill <em>(total points distributed among all players in the session based on damage dealt)</em></li>
+                            <li><span class="has-text-success">+{{ positiveActions.tank_kill_solo || 20 }}</span> per tank kill solo <em>(bonus for killer only)</em></li>
+                            <li><span class="has-text-success">+{{ positiveActions.tank_kill_melee || 50 }}</span> per tank kill melee <em>(bonus for killer only)</em></li>
+                            <li><span class="has-text-success">+{{ positiveActions.witch_kill || 15 }}</span> per witch kill</li>
+                            <li><span class="has-text-success">+{{ positiveActions.heal_teammate || 40 }}</span> per heal teammate <em>(+{{ positiveActions.heal_teammate_critical || 60 }} if target ≤30% health)</em></li>
+                            <li><span class="has-text-success">+{{ positiveActions.revive_teammate || 25 }}</span> per revive teammate</li>
+                            <li><span class="has-text-success">+{{ positiveActions.defib_teammate || 50 }}</span> per teammate defibbed</li>
+                            <li><span class="has-text-success">+{{ positiveActions.teammate_save || 20 }}</span> per teammate save from specials</li>
+                            <li><span class="has-text-success">+{{ positiveActions.ammo_pack_deploy || 20 }}</span> per ammo pack deploy</li>
+                            <li><span class="has-text-success">+{{ positiveActions.finale_win || 1000 }}</span> per finale win</li>
                             <br>
-                            <li><span class="has-text-danger">-500</span> for teammate kill</li>
-                            <li><span class="has-text-danger">-40</span> per damage point dealt to teammate</li>
+                            <li><span class="has-text-danger">{{ penalties.teammate_kill || -500 }}</span> for teammate kill</li>
+                            <li><span class="has-text-danger">{{ penalties.friendly_fire_per_damage || -40 }}</span> per damage point dealt to teammate</li>
                         </ul>
 
                         <br>
@@ -99,5 +107,72 @@
     <br>
 </div>
 </template>
-<script setup lang="ts">
+<script>
+export default {
+  data() {
+    return {
+      pointRules: null,
+      loadingRules: true,
+      rulesError: null
+    }
+  },
+  async mounted() {
+    await this.loadPointRules()
+  },
+  methods: {
+    async loadPointRules() {
+      try {
+        this.loadingRules = true
+        const response = await this.$http.get('/api/point-rules')
+        
+        if (response.data.success) {
+          this.pointRules = response.data.rules
+        } else {
+          throw new Error(response.data.message || 'Failed to load point rules')
+        }
+      } catch (error) {
+        console.error('Failed to load point rules:', error)
+        this.rulesError = error.message
+        // Fallback to default values if API fails
+        this.pointRules = {
+          point_values: {
+            positive_actions: {
+              common_kill: 1,
+              headshot: 2,
+              special_kill: 6,
+              tank_kill_max: 100,
+              tank_kill_solo: 20,
+              tank_kill_melee: 50,
+              witch_kill: 15,
+              heal_teammate: 40,
+              heal_teammate_critical: 60,
+              revive_teammate: 25,
+              defib_teammate: 50,
+              teammate_save: 20,
+              ammo_pack_deploy: 20,
+              finale_win: 1000
+            },
+            penalties: {
+              friendly_fire_per_damage: -40,
+              teammate_kill: -500
+            }
+          }
+        }
+      } finally {
+        this.loadingRules = false
+      }
+    }
+  },
+  computed: {
+    rules() {
+      return this.pointRules?.point_values || {}
+    },
+    positiveActions() {
+      return this.rules.positive_actions || {}
+    },
+    penalties() {
+      return this.rules.penalties || {}
+    }
+  }
+}
 </script>

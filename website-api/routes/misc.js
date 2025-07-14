@@ -170,6 +170,27 @@ export default function(pool) {
         }
     })
 
+    // Get point calculation rules from JSON config
+    router.get('/point-rules', routeCache.cacheSeconds(300), async(req,res) => {
+        try {
+            const rulesPath = path.join(process.cwd(), 'config', 'point-calculation-rules.json');
+            const rulesData = fs.readFileSync(rulesPath, 'utf8');
+            const pointRules = JSON.parse(rulesData);
+            
+            res.json({
+                success: true,
+                rules: pointRules
+            });
+        } catch(err) {
+            console.error('[/api/point-rules]', err.message);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to load point calculation rules',
+                message: err.message
+            });
+        }
+    });
+
     // Recalculate all user points based on current rules
     router.post('/recalculate', async(req,res) => {
         try {
