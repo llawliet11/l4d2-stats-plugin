@@ -634,7 +634,7 @@ public void OnClientDisconnect(int client) {
 			IncrementSessionStat(client);
 			RecordCampaign(client);
 			IncrementStat(client, "finales_won", 1);
-			players[client].RecordPoint(PType_FinishCampaign, 200);
+			players[client].RecordPoint(PType_FinishCampaign, 1000);
 		}
 		
 		// Handle tank disconnection
@@ -1729,15 +1729,8 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 			players[attacker].damageInfectedGiven += dmg;
 		}
 		if(attacker_team == 2 && victim_team == 2) {
-			// Tiered friendly fire penalty based on damage amount
-			int penalty = 0;
-			if(dmg >= 11) {
-				penalty = -40;  // High damage: -40 points
-			} else if(dmg >= 6) {
-				penalty = -20;  // Medium damage: -20 points  
-			} else if(dmg < 5) {
-				penalty = -10;  // Low damage: -10 points
-			}
+			// Flat friendly fire penalty: -40 per damage dealt to teammate
+			int penalty = dmg * -40;
 			
 			players[attacker].RecordPoint(PType_FriendlyFire, penalty);
 			players[attacker].damageSurvivorFF += dmg;
@@ -1908,7 +1901,7 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 			if(subject == client) {
 				IncrementStat(client, "heal_self", 1);
 			}else{
-				players[client].RecordPoint(PType_HealOther, 50);
+				players[client].RecordPoint(PType_HealOther, 40);
 				IncrementStat(client, "heal_others", 1);
 			}
 		} else if(StrEqual(name, "revive_success", true)) {
@@ -1919,7 +1912,7 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 				IncrementStat(subject, "revived", 1);
 			}
 		} else if(StrEqual(name, "defibrillator_used", true)) {
-			players[client].RecordPoint(PType_ResurrectOther, 7);
+			players[client].RecordPoint(PType_ResurrectOther, 50);
 			IncrementStat(client, "defibs_used", 1);
 		} else{
 			IncrementStat(client, name, 1);
@@ -2124,7 +2117,7 @@ void Event_FinaleWin(Event event, const char[] name, bool dontBroadcast) {
 				//get real client
 			}
 			if(players[client].steamid[0]) {
-				players[client].RecordPoint(PType_FinishCampaign, 200);
+				players[client].RecordPoint(PType_FinishCampaign, 1000);
 				IncrementSessionStat(client);
 				RecordCampaign(client);
 				IncrementStat(client, "finales_won", 1);
@@ -2207,6 +2200,11 @@ public void OnHunterDeadstop(int survivor, int hunter) {
 public void OnSpecialClear( int clearer, int pinner, int pinvictim, int zombieClass, float timeA, float timeB, bool withShove ) {
 	IncrementStat(clearer, "cleared_pinned", 1);
 	IncrementStat(pinvictim, "times_pinned", 1);
+	
+	// Award points for saving teammate from special infected
+	if(clearer > 0 && !IsFakeClient(clearer)) {
+		players[clearer].RecordPoint(PType_Generic, 20);
+	}
 }
 ////////////////////////////
 // NATIVES
