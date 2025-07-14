@@ -1,6 +1,8 @@
 import Router from 'express'
 const router = Router()
 import routeCache from 'route-cache'
+import fs from 'fs'
+import path from 'path'
 
 export default function(pool) {
     router.get('/info', routeCache.cacheSeconds(120), async(req,res) => {
@@ -173,6 +175,27 @@ export default function(pool) {
         try {
             console.log('[/api/recalculate] Starting point recalculation...');
             
+            // Load point calculation rules
+            let pointRules;
+            try {
+                const rulesPath = path.join(process.cwd(), 'config', 'point-calculation-rules.json');
+                const rulesData = fs.readFileSync(rulesPath, 'utf8');
+                pointRules = JSON.parse(rulesData);
+                console.log('[/api/recalculate] Loaded point calculation rules');
+            } catch (err) {
+                console.warn('[/api/recalculate] Could not load point rules, using defaults:', err.message);
+                pointRules = {
+                    point_values: {
+                        positive_actions: {
+                            common_kill: 1, special_kill: 6, witch_kill: 15,
+                            heal_teammate: 40, revive_teammate: 25, defib_teammate: 50,
+                            teammate_save: 20, finale_win: 1000
+                        },
+                        penalties: { friendly_fire_per_damage: -40 }
+                    }
+                };
+            }
+            
             // Clear existing points
             await pool.execute("DELETE FROM stats_points");
             console.log('[/api/recalculate] Cleared existing points');
@@ -190,75 +213,89 @@ export default function(pool) {
             
             console.log(`[/api/recalculate] Processing ${sessions.length} sessions...`);
             
+            if (sessions.length === 0) {
+                return res.json({
+                    success: false,
+                    message: 'No valid sessions found to process',
+                    stats: { sessions_processed: 0 }
+                });
+            }
+            
             let processedCount = 0;
+            let totalPointsCalculated = 0;
             const batchSize = 100;
             
             for (let i = 0; i < sessions.length; i += batchSize) {
                 const batch = sessions.slice(i, i + batchSize);
                 
                 for (const session of batch) {
-                    // Calculate points for this session based on current rules
+                    // Calculate points for this session using configuration
                     let points = 0;
+                    const pv = pointRules.point_values;
                     
                     // Common infected kills
-                    points += (session.ZombieKills || 0) * 1;
-                    
-                    // Headshots (assuming we track this somehow, if not skip)
-                    // points += (session.HeadshotKills || 0) * 2;
+                    points += (session.ZombieKills || 0) * (pv.positive_actions.common_kill || 1);
                     
                     // Special infected kills
-                    points += (session.SpecialInfectedKills || 0) * 6;
+                    points += (session.SpecialInfectedKills || 0) * (pv.positive_actions.special_kill || 6);
                     
-                    // Tank kills (distributed damage-based, for now just give participation)
+                    // Tank damage (approximate tank kill points)
                     if (session.DamageToTank && session.DamageToTank > 0) {
-                        points += Math.min(100, Math.floor(session.DamageToTank / 100)); // Rough approximation
+                        const tankHp = 6000; // Standard tank HP
+                        const damagePercent = Math.min(1.0, session.DamageToTank / tankHp);
+                        points += Math.floor(damagePercent * (pv.positive_actions.tank_kill_max || 100));
                     }
                     
                     // Witch kills
-                    points += (session.WitchesCrowned || 0) * 15;
+                    points += (session.WitchesCrowned || 0) * (pv.positive_actions.witch_kill || 15);
                     
-                    // Heal teammates - using MedkitsUsed and FirstAidShared as proxy
-                    points += ((session.MedkitsUsed || 0) + (session.FirstAidShared || 0)) * 40;
+                    // Heal teammates (using FirstAidShared as proxy)
+                    points += (session.FirstAidShared || 0) * (pv.positive_actions.heal_teammate || 40);
                     
                     // Revive teammates
-                    points += (session.ReviveOtherCount || 0) * 25;
+                    points += (session.ReviveOtherCount || 0) * (pv.positive_actions.revive_teammate || 25);
                     
                     // Defib teammates
-                    points += (session.DefibrillatorsUsed || 0) * 50;
+                    points += (session.DefibrillatorsUsed || 0) * (pv.positive_actions.defib_teammate || 50);
                     
-                    // Teammate saves (rough estimate from special kills that might be saves)
-                    points += Math.floor((session.SpecialInfectedKills || 0) * 0.3) * 20;
+                    // Teammate saves (estimated from special kills)
+                    const saveRatio = 0.3; // 30% of special kills are saves
+                    points += Math.floor((session.SpecialInfectedKills || 0) * saveRatio) * (pv.positive_actions.teammate_save || 20);
                     
-                    // Ammo packs (if tracked, otherwise skip)
-                    // points += (session.AmmoPacksUsed || 0) * 20;
-                    
-                    // Finale wins (check if this is a finale map)
+                    // Finale wins
                     if (session.finale_time && session.finale_time > 0) {
-                        points += 1000;
+                        points += (pv.positive_actions.finale_win || 1000);
                     }
                     
-                    // Penalties
-                    // Teammate kills (if tracked)
-                    // points -= (session.TeammateKills || 0) * 500;
+                    // Penalties - Friendly fire damage (limit to prevent overflow)
+                    const ffDamage = Math.min(10000, session.SurvivorDamage || 0); // Cap at 10k damage
+                    points += ffDamage * (pv.penalties.friendly_fire_per_damage || -40);
                     
-                    // Friendly fire damage
-                    points -= (session.SurvivorDamage || 0) * 40;
+                    // Limit points range to prevent database overflow
+                    points = Math.max(-50000, Math.min(50000, points));
                     
-                    // Ensure points don't go negative for individual sessions
-                    points = Math.max(0, points);
+                    // Allow negative points but track total
+                    totalPointsCalculated += points;
                     
-                    if (points > 0) {
-                        // Insert point record
+                    if (Math.abs(points) > 0) { // Record both positive and negative points
+                        // Insert point record (type should be an integer, not a string)
                         await pool.execute(
-                            "INSERT INTO stats_points (steamid, timestamp, type, amount) VALUES (?, ?, 'recalc_session', ?)",
-                            [session.steamid, session.date_end, points]
+                            "INSERT INTO stats_points (steamid, timestamp, type, amount) VALUES (?, ?, ?, ?)",
+                            [session.steamid, session.date_end, 0, points]
                         );
                         
-                        // Update user total
+                        // Update user total (ensure non-negative due to unsigned column)
                         await pool.execute(
-                            "UPDATE stats_users SET points = points + ? WHERE steamid = ?",
+                            "UPDATE stats_users SET points = GREATEST(0, points + ?) WHERE steamid = ?",
                             [points, session.steamid]
                         );
+                        
+                        // Debug log for first few sessions
+                        if (processedCount < 5) {
+                            console.log(`[/api/recalculate] Session ${processedCount + 1}: ${session.steamid} earned ${points} points`);
+                            console.log(`  - Zombies: ${session.ZombieKills || 0}, Specials: ${session.SpecialInfectedKills || 0}`);
+                            console.log(`  - FF Damage: ${session.SurvivorDamage || 0}, Finale: ${session.finale_time > 0 ? 'Yes' : 'No'}`);
+                        }
                     }
                     
                     processedCount++;
@@ -286,6 +323,7 @@ export default function(pool) {
                 message: 'Points recalculated successfully',
                 stats: {
                     sessions_processed: processedCount,
+                    total_points_calculated: totalPointsCalculated,
                     ...finalStats[0]
                 }
             });
