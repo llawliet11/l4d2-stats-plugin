@@ -263,7 +263,7 @@ export default function(pool) {
         const stats = row.length > 0 ? row[0] : {};
         [row] = await pool.execute("SELECT map as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? GROUP BY `map` ORDER BY count desc", [user]);
         const topMap = row.length > 0 ? row[0] : null;
-        [row] = await pool.execute("SELECT top_weapon as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? AND top_weapon IS NOT NULL AND top_weapon != '' GROUP BY `top_weapon` ORDER BY count DESC LIMIT 1 ", [user]);
+        [row] = await pool.execute("SELECT weapon as k, minutesUsed FROM `stats_weapons_usage` WHERE steamid = ? ORDER BY minutesUsed DESC LIMIT 1", [user]);
         const topWeapon = row.length > 0 ? (row[0]?.k).replace('weapon_','') : null;
         [row] = await pool.execute('SELECT (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` NOT RLIKE "^c[0-9]+m") as custom,  (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` RLIKE "^c[0-9]+m") as official FROM `stats_games` LIMIT 1', [user, user]);
         const maps = row[0] ? {
