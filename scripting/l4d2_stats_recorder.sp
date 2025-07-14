@@ -74,6 +74,12 @@ int g_iTankClient = 0;                 // Current tank client ID
 int g_iTankHealth = 0;                 // Current tank health
 #define ZOMBIECLASS_TANK 8             // Tank zombie class ID
 
+// Anti-abuse: Time-based heal cooldown system
+int g_iLastHealTime[MAXPLAYERS + 1][MAXPLAYERS + 1]; // [healer][target] - last heal time
+#define HEAL_COOLDOWN_TIME 300         // 5 minutes in seconds
+#define HEAL_HEALTH_THRESHOLD 60       // Only award points if target health <= 60%
+#define HEAL_CRITICAL_THRESHOLD 30     // Bonus points if target health <= 30%
+
 char OFFICIAL_MAP_NAMES[14][] = {
 	"Dead Center",   // c1
 	"Dark Carnival", // c2
@@ -392,6 +398,9 @@ public void OnPluginStart() {
 	if(g_Game != Engine_Left4Dead2) {
 		SetFailState("This plugin is for L4D/L4D2 only.");	
 	}
+	
+	// Initialize anti-abuse systems
+	ResetHealCooldowns();
 	if(!SQL_CheckConfig("stats")) {
 		SetFailState("No database entry for 'stats'; no database to connect to.");
 	} else if(!ConnectDB()) {
@@ -1901,7 +1910,29 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 			if(subject == client) {
 				IncrementStat(client, "heal_self", 1);
 			}else{
-				players[client].RecordPoint(PType_HealOther, 40);
+				// Anti-abuse: Check heal cooldown and target health
+				int targetHealth = GetClientHealth(subject);
+				int targetMaxHealth = GetEntProp(subject, Prop_Send, "m_iMaxHealth");
+				int healthPercent = RoundToNearest((float(targetHealth) / float(targetMaxHealth)) * 100.0);
+				
+				if(healthPercent <= HEAL_HEALTH_THRESHOLD) {
+					if(IsHealCooldownExpired(client, subject)) {
+						// Award points based on target health
+						int healPoints = (healthPercent <= HEAL_CRITICAL_THRESHOLD) ? 60 : 40;
+						players[client].RecordPoint(PType_HealOther, healPoints);
+						SetHealTime(client, subject);
+						
+						PrintToServer("[AntiAbuse] %N earned %d heal points on %N (%d%% health)", 
+							client, healPoints, subject, healthPercent);
+					} else {
+						int timeLeft = GetHealCooldownRemaining(client, subject);
+						PrintToChat(client, "[Heal Cooldown] Wait %d seconds before earning points for healing %N again", 
+							timeLeft, subject);
+					}
+				} else {
+					PrintToChat(client, "[Heal] No points awarded - %N has sufficient health (%d%%)", 
+						subject, healthPercent);
+				}
 				IncrementStat(client, "heal_others", 1);
 			}
 		} else if(StrEqual(name, "revive_success", true)) {
@@ -1946,6 +1977,33 @@ void ClearTankDamage() {
 	for(int i = 1; i <= MaxClients; i++) {
 		g_iTankDamage[i] = 0;
 	}
+}
+
+// Anti-abuse: Heal cooldown helper functions
+bool IsHealCooldownExpired(int healer, int target) {
+	int currentTime = GetTime();
+	int lastHealTime = g_iLastHealTime[healer][target];
+	return (currentTime - lastHealTime) >= HEAL_COOLDOWN_TIME;
+}
+
+void SetHealTime(int healer, int target) {
+	g_iLastHealTime[healer][target] = GetTime();
+}
+
+int GetHealCooldownRemaining(int healer, int target) {
+	int currentTime = GetTime();
+	int lastHealTime = g_iLastHealTime[healer][target];
+	int timeElapsed = currentTime - lastHealTime;
+	return (timeElapsed >= HEAL_COOLDOWN_TIME) ? 0 : (HEAL_COOLDOWN_TIME - timeElapsed);
+}
+
+void ResetHealCooldowns() {
+	for(int i = 1; i <= MaxClients; i++) {
+		for(int j = 1; j <= MaxClients; j++) {
+			g_iLastHealTime[i][j] = 0;
+		}
+	}
+	PrintToServer("[AntiAbuse] Heal cooldowns reset (plugin reload)");
 }
 
 int FindTankClient() {
