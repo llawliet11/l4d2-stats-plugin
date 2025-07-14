@@ -1,6 +1,8 @@
 import Router from 'express'
 const router = Router()
 import routeCache from 'route-cache'
+import fs from 'fs'
+import path from 'path'
 
 export default function(pool) {
     router.get('/', routeCache.cacheSeconds(120), async(req,res) => {
@@ -31,8 +33,60 @@ export default function(pool) {
                 if(row.length > 0) {
                     let users = [];
                     if(row[0].campaignID) {
-                        const [userlist] = await pool.query("SELECT stats_games.id,stats_users.steamid,stats_users.last_alias from `stats_games` inner join `stats_users` on `stats_users`.steamid = `stats_games`.steamid WHERE `campaignID`=?", [row[0].campaignID])
-                        users = userlist;
+                        // Load MVP calculation rules
+                        let calculationRules;
+                        try {
+                            const rulesPath = path.join(process.cwd(), 'config', 'calculation-rules.json');
+                            const rulesData = fs.readFileSync(rulesPath, 'utf8');
+                            calculationRules = JSON.parse(rulesData);
+                        } catch (err) {
+                            console.warn('[/api/sessions/:session] Could not load calculation rules, using defaults:', err.message);
+                            calculationRules = {
+                                mvp_calculation: {
+                                    criteria: [
+                                        { field: "SpecialInfectedKills", direction: "desc" },
+                                        { field: "SurvivorFFCount", direction: "asc" },
+                                        { field: "ZombieKills", direction: "desc" },
+                                        { field: "DamageTaken", direction: "asc" },
+                                        { field: "SurvivorDamage", direction: "asc" }
+                                    ]
+                                }
+                            };
+                        }
+
+                        // Build MVP sorting criteria from config
+                        const mvpCriteria = calculationRules.mvp_calculation?.criteria || [
+                            { field: "SpecialInfectedKills", direction: "desc" },
+                            { field: "SurvivorFFCount", direction: "asc" },
+                            { field: "ZombieKills", direction: "desc" },
+                            { field: "DamageTaken", direction: "asc" },
+                            { field: "SurvivorDamage", direction: "asc" }
+                        ]
+                        const orderBy = mvpCriteria.map(c => `${c.field} ${c.direction}`).join(', ')
+                        
+                        // Get campaign participants with MVP ranking
+                        const [userlist] = await pool.query(`
+                            SELECT 
+                                stats_games.id,
+                                stats_users.steamid,
+                                stats_users.last_alias,
+                                stats_games.points,
+                                stats_games.SpecialInfectedKills,
+                                stats_games.SurvivorFFCount,
+                                stats_games.ZombieKills,
+                                stats_games.DamageTaken,
+                                stats_games.SurvivorDamage
+                            FROM stats_games 
+                            INNER JOIN stats_users ON stats_users.steamid = stats_games.steamid 
+                            WHERE campaignID = ? 
+                            ORDER BY ${orderBy}
+                        `, [row[0].campaignID])
+                        
+                        // Mark the first player as MVP
+                        users = userlist.map((user, index) => ({
+                            ...user,
+                            isMVP: index === 0
+                        }));
                     }
                     res.json({session: row[0], users})
                 } else 
