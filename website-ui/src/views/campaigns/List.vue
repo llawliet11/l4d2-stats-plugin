@@ -87,7 +87,7 @@
                                 <span class="is-size-7">{{formatDate(campaign.date_end)}}</span>
                             </td>
                             <td>
-                                <strong>{{secondsToHms((campaign.date_end-campaign.date_start))}}</strong>
+                                <strong>{{getGameDuration(campaign.duration_seconds)}}</strong>
                             </td>
                             <td>
                                 <strong>{{campaign.Deaths}}</strong>
@@ -136,7 +136,7 @@
                             <div class="columns is-mobile is-multiline">
                                 <div class="column is-6 has-text-centered">
                                     <p class="heading">Duration</p>
-                                    <p class="title is-5">{{getGameDuration((campaign.date_end-campaign.date_start))}}</p>
+                                    <p class="title is-5">{{getGameDuration(campaign.duration_seconds)}}</p>
                                 </div>
                                 <div class="column is-6 has-text-centered">
                                     <p class="heading">Deaths</p>
@@ -308,13 +308,17 @@ export default {
         },
         getGameDuration(d) {
             d = Number(d)
-            const h = Math.floor(d / 3600);
+            if (isNaN(d) || d <= 0) {
+                return "Unknown duration"
+            }
+            // d is in seconds, convert to minutes and hours
+            const totalMinutes = Math.round(d / 60);
+            const h = Math.floor(totalMinutes / 60);
             if(h >= 1) {
-                const m = Math.floor(d % 3600 / 60);
+                const m = totalMinutes % 60;
                 return `${h} hour${h == 1?'':'s'} & ${m} min`
             }
-            const m = Math.round(d / 60)
-            return `${m} minutes`
+            return `${totalMinutes} minutes`
         },
         secondsToHms(d) {
             d = Number(d);
