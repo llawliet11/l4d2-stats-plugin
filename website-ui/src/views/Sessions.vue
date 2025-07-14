@@ -12,7 +12,40 @@
     </section>
     <br>
     <div class="container is-fluid">
-        <h5 class="title is-5">Sorted by Points (Overall MVP determined by criteria below)</h5>
+        <h5 class="title is-5">Sorted by Points (Overall MVP determined by MVP Points calculation)</h5>
+        <div class="notification is-info">
+            <h6 class="title is-6">MVP Points Calculation:</h6>
+            <div class="columns">
+                <div class="column">
+                    <strong>Combat Actions:</strong>
+                    <ul style="margin-left: 20px;">
+                        <li>Special Infected Kills × 6</li>
+                        <li>Common Kills × 1</li>
+                        <li>Tank Kills × 100</li>
+                        <li>Witch Kills × 15</li>
+                        <li>Finales Won × 1000</li>
+                    </ul>
+                </div>
+                <div class="column">
+                    <strong>Teamwork & Items:</strong>
+                    <ul style="margin-left: 20px;">
+                        <li>Heals × 40</li>
+                        <li>Revives × 25</li>
+                        <li>Defibs × 30</li>
+                        <li>Molotovs/Pipes/Bile × 5</li>
+                        <li>Pills × 10, Adrenaline × 15</li>
+                        <li>Damage Taken Bonus × 0.5</li>
+                    </ul>
+                </div>
+                <div class="column">
+                    <strong>Penalties:</strong>
+                    <ul style="margin-left: 20px;">
+                        <li>Teammate Kills × -100</li>
+                        <li>Friendly Fire Damage × -2</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
         <b-table
             :data="sessions"
             :loading="loading"
@@ -52,6 +85,9 @@
                 </b-table-column>
                 <b-table-column v-slot="props" field="SurvivorDamage" label="Friendly Fire" centered cell-class="number-cell">
                     {{ props.row.SurvivorDamage | formatNumber }}
+                </b-table-column>
+                <b-table-column v-slot="props" field="mvpPoints" label="MVP Points" centered cell-class="mvp-points-cell">
+                    {{ props.row.mvpPoints | formatNumber }}
                 </b-table-column>
                 <b-table-column v-slot="props" field="MedkitsUsed" label="Medkits Used" centered cell-class="number-cell">
                     {{ props.row.MedkitsUsed | formatNumber }}
@@ -182,5 +218,9 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
     font-size: 0.75rem;
     font-weight: bold;
     margin-left: 6px;
+}
+.mvp-points-cell {
+    color: #23d160 !important;
+    font-weight: bold;
 }
 </style>

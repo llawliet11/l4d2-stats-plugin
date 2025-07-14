@@ -20,11 +20,17 @@
       "defib_teammate": 30,
       "teammate_save": 10,
       "ammo_pack_deploy": 20,
-      "finale_win": 1000
+      "finale_win": 1000,
+      "molotov_use": 5,
+      "pipe_use": 5,
+      "bile_use": 5,
+      "pill_use": 10,
+      "adrenaline_use": 15,
+      "damage_taken_bonus": 0.5
     },
     
     "penalties": {
-      "friendly_fire_per_damage": -3,
+      "friendly_fire_per_damage": -2,
       "teammate_kill": -100
     }
   },

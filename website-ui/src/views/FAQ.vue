@@ -90,15 +90,33 @@
                 </div>
                 <div class="card-content">
                     <div class="content">
-                        <p>Campaign MVP is determined by the following fields:</p>
-                        <ol>
-                            <li>Special Infected Killed <em>(highest number)</em></li>
-                            <li>Survivor FF Count <em>(lowest number)</em></li>
-                            <li>Zombie Kills <em>(highest number)</em></li>
-                            <li>Damage Taken <em>(lowest number)</em></li>
-                            <li>Friendly Fire<em>(lowest number)</em></li>
-                        </ol>
-                        <p>When a campaign is fetched, the list of sessions for that campaign are sorted in the order listed above. The first player in the list will be assigned the MVP.</p>
+                        <p>MVP is determined by calculating total points using the following formula:</p>
+                        
+                        <h6 class="title is-6 has-text-success">Positive Actions:</h6>
+                        <ul>
+                            <li><strong>Special Infected Kills × 6</strong> - Reward skilled gameplay</li>
+                            <li><strong>Common Kills × 1</strong> - Basic zombie clearing</li>
+                            <li><strong>Tank Kills × 100</strong> - Major threat elimination</li>
+                            <li><strong>Witch Kills × 15</strong> - Precision kills</li>
+                            <li><strong>Heals × 40</strong> - Team support</li>
+                            <li><strong>Revives × 25</strong> - Saving teammates</li>
+                            <li><strong>Defibs × 30</strong> - Critical rescues</li>
+                            <li><strong>Finales Won × 1000</strong> - Campaign completion</li>
+                            <li><strong>Molotovs Used × 5</strong> - Tactical throwables</li>
+                            <li><strong>Pipe Bombs Used × 5</strong> - Area control</li>
+                            <li><strong>Bile Bombs Used × 5</strong> - Distraction tactics</li>
+                            <li><strong>Pills Used × 10</strong> - Self-care</li>
+                            <li><strong>Adrenaline Used × 15</strong> - Speed boost usage</li>
+                            <li><strong>Damage Taken Bonus × 0.5</strong> - Reward for taking less damage than average</li>
+                        </ul>
+
+                        <h6 class="title is-6 has-text-danger">Penalties:</h6>
+                        <ul>
+                            <li><strong>Teammate Kills × -100</strong> - Severe penalty</li>
+                            <li><strong>Friendly Fire Damage × -2</strong> - Per damage point dealt to teammates</li>
+                        </ul>
+
+                        <p><strong>The player with the highest MVP Points total is awarded MVP.</strong> This system rewards good teamwork, skilled gameplay, and penalizes excessive friendly fire.</p>
                     </div>
                 </div>
             </b-collapse>
