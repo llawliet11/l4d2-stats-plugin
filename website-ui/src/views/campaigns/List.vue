@@ -11,43 +11,55 @@
         </div>
     </section>
     <br>
-    <div class="container">
-        <h5 class="title is-5 has-text-centered">Recently Played Games</h5>
-        <div class="columns is-multiline">
-            <div v-for="campaign in recentCampaigns" class="column is-6-tablet is-4-desktop is-3-widescreen" :key="campaign.campaignID">
-                <div class="card">
-                    <div class="card-image">
-                        <figure class="image is-4by3">
-                            <img :src="getMapImage(campaign.map)" style="object-fit: cover;" />
-                        </figure>
-                    </div>
-                    <div class="card-content">
+    <section class="section">
+        <div class="container">
+            <h2 class="title is-4 has-text-centered mb-6">Recently Played Games</h2>
+            <div class="columns is-multiline">
+                <div v-for="campaign in recentCampaigns" class="column is-6-tablet is-4-desktop is-3-widescreen" :key="campaign.campaignID">
+                    <div class="box" style="height: 100%;">
+                        <div class="media">
+                            <div class="media-left">
+                                <figure class="image is-64x64">
+                                    <img :src="getMapImage(campaign.map)" style="object-fit: cover; border-radius: 4px;" />
+                                </figure>
+                            </div>
+                            <div class="media-content">
+                                <p class="title is-6">{{campaign.map_name || campaign.map}}</p>
+                                <p class="subtitle is-7">
+                                    <span class="tag is-info is-small">{{getGamemode(campaign.gamemode)}}</span>
+                                    <span class="tag is-warning is-small">{{formatDifficulty(campaign.difficulty)}}</span>
+                                </p>
+                            </div>
+                        </div>
+
                         <div class="content">
-                            <h6 class="title is-6 mb-2">{{campaign.map_name || campaign.map}}</h6>
-                            <div class="tags mb-3">
-                                <span class="tag is-info">{{getGamemode(campaign.gamemode)}}</span>
-                                <span class="tag is-warning">{{formatDifficulty(campaign.difficulty)}}</span>
-                            </div>
-
-                            <div class="columns is-mobile is-gapless">
-                                <div class="column has-text-centered">
-                                    <p class="heading">Duration</p>
-                                    <p class="title is-6">{{getGameDuration((campaign.date_end-campaign.date_start))}}</p>
+                            <div class="level is-mobile">
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Duration</p>
+                                        <p class="title is-6">{{getGameDuration((campaign.date_end-campaign.date_start))}}</p>
+                                    </div>
                                 </div>
-                                <div class="column has-text-centered">
-                                    <p class="heading">Deaths</p>
-                                    <p class="title is-6">{{campaign.Deaths}}</p>
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Deaths</p>
+                                        <p class="title is-6">{{campaign.Deaths}}</p>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="columns is-mobile is-gapless">
-                                <div class="column has-text-centered">
-                                    <p class="heading">Commons</p>
-                                    <p class="title is-6">{{campaign.CommonsKilled | formatNumber}}</p>
+                            <div class="level is-mobile">
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Commons</p>
+                                        <p class="title is-6">{{campaign.CommonsKilled | formatNumber}}</p>
+                                    </div>
                                 </div>
-                                <div class="column has-text-centered">
-                                    <p class="heading">FF Damage</p>
-                                    <p class="title is-6">{{campaign.FF | formatNumber}}</p>
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">FF Damage</p>
+                                        <p class="title is-6">{{campaign.FF | formatNumber}}</p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -58,20 +70,19 @@
                                     </b-tag>
                                 </b-taglist>
                             </div>
+
+                            <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded size="is-small">
+                                View Details
+                            </b-button>
                         </div>
                     </div>
-                    <footer class="card-footer">
-                        <router-link :to="'/campaigns/' + campaign.campaignID" class="card-footer-item">
-                            View Details
-                        </router-link>
-                    </footer>
                 </div>
             </div>
         </div>
-    </div>
-    <hr>
-    <div class="container">
-        <h5 class="title is-5 has-text-centered">Search Played Campaigns</h5>
+    </section>
+    <section class="section">
+        <div class="container">
+            <h2 class="title is-4 has-text-centered mb-6">Search Played Campaigns</h2>
         <div class="box">
             <b-field grouped multiline>
             <b-field label="Tag Selection">
@@ -114,44 +125,55 @@
             </b-field>
         </b-field>
         </div>
-        <div class="columns is-multiline">
-            <div v-for="campaign in filtered.list" class="column is-6-tablet is-4-desktop is-3-widescreen" :key="campaign.campaignID">
-                <div class="card">
-                    <div class="card-image">
-                        <figure class="image is-4by3">
-                            <img :src="getMapImage(campaign.map)" style="object-fit: cover;" />
-                        </figure>
-                    </div>
-                    <div class="card-content">
+            <div class="columns is-multiline">
+                <div v-for="campaign in filtered.list" class="column is-6-tablet is-4-desktop is-3-widescreen" :key="campaign.campaignID">
+                    <div class="box" style="height: 100%;">
+                        <div class="media">
+                            <div class="media-left">
+                                <figure class="image is-64x64">
+                                    <img :src="getMapImage(campaign.map)" style="object-fit: cover; border-radius: 4px;" />
+                                </figure>
+                            </div>
+                            <div class="media-content">
+                                <p class="title is-6">{{campaign.map_name ?? campaign.map}}</p>
+                                <p class="subtitle is-7">
+                                    <span class="tag is-info is-small">{{getGamemode(campaign.gamemode)}}</span>
+                                    <span class="tag is-warning is-small">{{formatDifficulty(campaign.difficulty)}}</span>
+                                </p>
+                                <p class="is-size-7 has-text-grey">
+                                    Played <strong>{{formatDate(campaign.date_end)}}</strong>
+                                </p>
+                            </div>
+                        </div>
+
                         <div class="content">
-                            <h6 class="title is-6 mb-2">{{campaign.map_name ?? campaign.map}}</h6>
-                            <div class="tags mb-3">
-                                <span class="tag is-info">{{getGamemode(campaign.gamemode)}}</span>
-                                <span class="tag is-warning">{{formatDifficulty(campaign.difficulty)}}</span>
-                            </div>
-                            <p class="is-size-7 has-text-grey mb-3">
-                                Played <strong>{{formatDate(campaign.date_end)}}</strong>
-                            </p>
-
-                            <div class="columns is-mobile is-gapless">
-                                <div class="column has-text-centered">
-                                    <p class="heading">Duration</p>
-                                    <p class="title is-6">{{secondsToHms((campaign.date_end-campaign.date_start))}}</p>
+                            <div class="level is-mobile">
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Duration</p>
+                                        <p class="title is-6">{{secondsToHms((campaign.date_end-campaign.date_start))}}</p>
+                                    </div>
                                 </div>
-                                <div class="column has-text-centered">
-                                    <p class="heading">Deaths</p>
-                                    <p class="title is-6">{{campaign.Deaths}}</p>
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Deaths</p>
+                                        <p class="title is-6">{{campaign.Deaths}}</p>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="columns is-mobile is-gapless">
-                                <div class="column has-text-centered">
-                                    <p class="heading">Commons</p>
-                                    <p class="title is-6">{{campaign.CommonsKilled | formatNumber}}</p>
+                            <div class="level is-mobile">
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Commons</p>
+                                        <p class="title is-6">{{campaign.CommonsKilled | formatNumber}}</p>
+                                    </div>
                                 </div>
-                                <div class="column has-text-centered">
-                                    <p class="heading">Players</p>
-                                    <p class="title is-6">{{campaign.playerCount}}</p>
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Players</p>
+                                        <p class="title is-6">{{campaign.playerCount}}</p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -162,18 +184,16 @@
                                     </b-tag>
                                 </b-taglist>
                             </div>
+
+                            <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded size="is-small">
+                                View Details
+                            </b-button>
                         </div>
                     </div>
-                    <footer class="card-footer">
-                        <router-link :to="'/campaigns/' + campaign.campaignID" class="card-footer-item">
-                            View Details
-                        </router-link>
-                    </footer>
                 </div>
             </div>
         </div>
-        <br>
-    </div>
+    </section>
 </div>
 </template>
 
