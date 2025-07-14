@@ -40,19 +40,26 @@
                             <li><span class="has-text-success">+20</span> per tank kill solo <em>(bonus for killer only)</em></li>
                             <li><span class="has-text-success">+50</span> per tank kill melee <em>(bonus for killer only)</em></li>
                             <li><span class="has-text-success">+15</span> per witch kill</li>
-                            <li><span class="has-text-success">+50</span> per heal teammate</li>
+                            <li><span class="has-text-success">+40</span> per heal teammate <em>(+60 if target ≤30% health)</em></li>
                             <li><span class="has-text-success">+25</span> per revive teammate</li>
-                            <li><span class="has-text-success">+7</span> per teammate defibbed</li>
+                            <li><span class="has-text-success">+50</span> per teammate defibbed</li>
+                            <li><span class="has-text-success">+20</span> per teammate save from specials</li>
                             <li><span class="has-text-success">+20</span> per ammo pack deploy</li>
-                            <li><span class="has-text-success">+200</span> per finale win</li>
+                            <li><span class="has-text-success">+1000</span> per finale win</li>
                             <br>
                             <li><span class="has-text-danger">-500</span> for teammate kill</li>
-                            <li><span class="has-text-danger">-40</span> per teammate dmg <em>(11+ HP lost)</em></li>
-                            <li><span class="has-text-danger">-20</span> per teammate dmg <em>(6-10 HP lost)</em></li>
-                            <li><span class="has-text-danger">-10</span> per teammate dmg <em>(1-5 HP lost)</em></li>
+                            <li><span class="has-text-danger">-40</span> per damage point dealt to teammate</li>
                         </ul>
                         <br>
                         <p><strong>Tank Kill Points:</strong> When a tank is killed, the 100 points are distributed among all players who participated in the current game session based on their damage contribution. For example, if 4 players fight a tank and deal 50%, 30%, 15%, and 5% damage respectively, they receive 50, 30, 15, and 5 points. Solo and melee bonuses are awarded only to the player who delivers the killing blow.</p>
+                        <br>
+                        <p><strong>Healing Anti-Abuse System:</strong> To prevent point farming, healing points are only awarded when:</p>
+                        <ul>
+                            <li>Target player has ≤60% health</li>
+                            <li>5-minute cooldown has expired since last heal on same target</li>
+                            <li>Critical heals (≤30% health) award bonus points (+60 instead of +40)</li>
+                            <li>Cooldown persists through team wipes and map restarts</li>
+                        </ul>
                     </div>
                 </div>
             </b-collapse>
