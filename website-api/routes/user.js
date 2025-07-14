@@ -278,11 +278,11 @@ export default function(pool) {
         ctx.fillText(value, x + twS.width, y)
     }
     async function getUserStats(user) {
-        let [row] = await pool.execute("SELECT characterType as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? AND characterType IS NOT NULL GROUP BY `characterType` ORDER BY count DESC LIMIT 1", [user]);
-        const topCharacter = row.length > 0 ? SurvivorNames[row[0].k].toLowerCase() : null;
-        [row] = await pool.execute("SELECT last_alias, witches_crowned, clowns_honked from stats_users WHERE steamid = ?", [user]);
-        const stats = row.length > 0 ? row2[0] : {};
-        [row] = await pool.execute("SELECT map as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? GROUP BY `map` ORDER BY count desc", [user]);
+        let [row1] = await pool.execute("SELECT characterType as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? AND characterType IS NOT NULL GROUP BY `characterType` ORDER BY count DESC LIMIT 1", [user]);
+        const topCharacter = row1.length > 0 ? SurvivorNames[row1[0].k].toLowerCase() : null;
+        let [row2] = await pool.execute("SELECT last_alias, witches_crowned, clowns_honked from stats_users WHERE steamid = ?", [user]);
+        const stats = row2.length > 0 ? row2[0] : {};
+        let [row3] = await pool.execute("SELECT map as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? GROUP BY `map` ORDER BY count desc", [user]);
         const topMap = row3.length > 0 ? row3[0] : null;
         // Get top weapon based on config rules
         const weaponConfig = calculationRules.top_weapon_calculation || { 
@@ -297,8 +297,8 @@ export default function(pool) {
         let [row5] = await pool.execute('SELECT (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` NOT RLIKE "^c[0-9]+m") as custom,  (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` RLIKE "^c[0-9]+m") as official FROM `stats_games` LIMIT 1', [user, user]);
         const maps = row5[0] ? {
             official: row5[0].official ,
-            custom: row[0].custom,
-            total: row[0].custom + row[0].official,
+            custom: row5[0].custom,
+            total: row5[0].custom + row5[0].official,
         } : { official: 0, custom: 0, total: 0 }
         return {
             top: {
