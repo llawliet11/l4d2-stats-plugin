@@ -1,6 +1,8 @@
 import Router from 'express'
 const router = Router()
 import routeCache from 'route-cache'
+import fs from 'fs'
+import path from 'path'
 
 import Canvas from 'canvas'
 
@@ -14,8 +16,26 @@ const WeaponNames = GameData.weapons
 const DifficultyNames = GameData.difficulties
 import { getMapName } from '../map.js'
 
+// Load calculation rules from config file
+const configPath = path.join(process.cwd(), 'config', 'calculation-rules.json')
+let calculationRules = {}
+try {
+    calculationRules = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+} catch (err) {
+    console.warn('Could not load calculation-rules.json, using defaults:', err.message)
+    calculationRules = {
+        top_weapon_calculation: { 
+            source_table: "stats_weapons_usage",
+            criteria: { field: "minutesUsed", direction: "desc" }
+        },
+        pagination: { sessions_per_page: 10, points_per_page: 50, max_per_page: 100 },
+        cache_durations: { user_top: 60, user_averages: 120, user_image: 600, user_random: 86400 },
+        query_limits: { top_session_limit: 10, minimum_session_duration: 300 }
+    }
+}
+
 export default function(pool) {
-    router.get('/random', routeCache.cacheSeconds(86400), async(req,res) => {
+    router.get('/random', routeCache.cacheSeconds(calculationRules.cache_durations?.user_random || 86400), async(req,res) => {
         try {
             const [results] = await pool.execute("SELECT * FROM `stats_users` ORDER BY RAND() LIMIT 1")
             return res.json({user: results[0]})
@@ -127,15 +147,16 @@ export default function(pool) {
         }
     })
     //TODO: points system
-    router.get('/:user/top', routeCache.cacheSeconds(60), async(req,res) => {
+    router.get('/:user/top', routeCache.cacheSeconds(calculationRules.cache_durations?.user_top || 60), async(req,res) => {
         try {
             const userInfo = await getUserStats(req.params.user)
-            const [top_session] = await pool.execute("SELECT *, map, date_end - date_start as difference FROM stats_games WHERE date_end > 0 AND date_start > 0 AND steamid = ? ORDER BY difference ASC LIMIT 10", [req.params.user])
+            const topSessionLimit = calculationRules.query_limits?.top_session_limit || 10
+            const [top_session] = await pool.execute("SELECT *, map, date_end - date_start as difference FROM stats_games WHERE date_end > 0 AND date_start > 0 AND steamid = ? ORDER BY difference ASC LIMIT ?", [req.params.user, topSessionLimit])
             res.json({
                 topMap: userInfo.top.map,
                 topCharacter: userInfo.top.character,
                 topWeapon: userInfo.top.weapon.name,
-                bestSessionByTime: top_session.length > 0 ? top_session.find(session => session.difference > 300) : null,
+                bestSessionByTime: top_session.length > 0 ? top_session.find(session => session.difference > (calculationRules.query_limits?.minimum_session_duration || 300)) : null,
                 mapsPlayed: {
                     custom: userInfo.maps.custom,
                     official: userInfo.maps.official,
@@ -151,8 +172,8 @@ export default function(pool) {
  
     router.get('/:user/points/:page', async (req,res) => {
         try {
-            let perPage = parseInt(req.query.perPage) || 50;
-            if(perPage > 100) perPage = 100;
+            let perPage = parseInt(req.query.perPage) || calculationRules.pagination?.points_per_page || 50;
+            if(perPage > (calculationRules.pagination?.max_per_page || 100)) perPage = calculationRules.pagination?.max_per_page || 100;
             const selectedPage = req.params.page || 0
             const pageNumber = (isNaN(selectedPage) || selectedPage <= 0) ? 0 : (parseInt(selectedPage) - 1);
             const offset = pageNumber * perPage;
@@ -169,8 +190,8 @@ export default function(pool) {
     })
     router.get('/:user/sessions/:page', async (req, res) => {
         try {
-            let perPage = parseInt(req.query.perPage) || 10;
-            if(perPage > 100) perPage = 100;
+            let perPage = parseInt(req.query.perPage) || calculationRules.pagination?.sessions_per_page || 10;
+            if(perPage > (calculationRules.pagination?.max_per_page || 100)) perPage = calculationRules.pagination?.max_per_page || 100;
             const selectedPage = req.params.page || 0
             const pageNumber = (isNaN(selectedPage) || selectedPage <= 0) ? 0 : (parseInt(selectedPage) - 1);
             const offset = pageNumber * perPage;
@@ -185,7 +206,7 @@ export default function(pool) {
             res.status(500).json({error:'Internal Server Error'})
         }
     })
-    router.get('/:user/averages', routeCache.cacheSeconds(120), async(req,res) => {
+    router.get('/:user/averages', routeCache.cacheSeconds(calculationRules.cache_durations?.user_averages || 120), async(req,res) => {
         if(!req.params.user) return res.status(404).json(null)
         try {
             const [totalSessions] = await pool.execute("SELECT (SELECT COUNT(*) as count FROM stats_games WHERE steamid = ?) as count, (SELECT COUNT(*) FROM `stats_games`) AS total_sessions", [req.params.user])
@@ -200,7 +221,7 @@ export default function(pool) {
             res.status(500).json({error:"Internal Server Error"})
         }
     })
-    router.get('/:user/image', routeCache.cacheSeconds(600), async(req, res) => {
+    router.get('/:user/image', routeCache.cacheSeconds(calculationRules.cache_durations?.user_image || 600), async(req, res) => {
         if(!req.params.user) return res.status(404).json(null)
         try {
             const { top, name, maps, stats } = await getUserStats(req.params.user)
@@ -263,7 +284,15 @@ export default function(pool) {
         const stats = row.length > 0 ? row[0] : {};
         [row] = await pool.execute("SELECT map as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? GROUP BY `map` ORDER BY count desc", [user]);
         const topMap = row.length > 0 ? row[0] : null;
-        [row] = await pool.execute("SELECT weapon as k, minutesUsed FROM `stats_weapons_usage` WHERE steamid = ? ORDER BY minutesUsed DESC LIMIT 1", [user]);
+        // Get top weapon based on config rules
+        const weaponConfig = calculationRules.top_weapon_calculation || { 
+            source_table: "stats_weapons_usage", 
+            criteria: { field: "minutesUsed", direction: "desc" } 
+        }
+        const sourceTable = weaponConfig.source_table || "stats_weapons_usage"
+        const criteria = weaponConfig.criteria || { field: "minutesUsed", direction: "desc" }
+        
+        [row] = await pool.execute(`SELECT weapon as k, ${criteria.field} FROM \`${sourceTable}\` WHERE steamid = ? ORDER BY ${criteria.field} ${criteria.direction} LIMIT 1`, [user]);
         const topWeapon = row.length > 0 ? (row[0]?.k).replace('weapon_','') : null;
         [row] = await pool.execute('SELECT (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` NOT RLIKE "^c[0-9]+m") as custom,  (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` RLIKE "^c[0-9]+m") as official FROM `stats_games` LIMIT 1', [user, user]);
         const maps = row[0] ? {

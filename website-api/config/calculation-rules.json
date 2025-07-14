@@ -1,0 +1,100 @@
+{
+  "_comment": "L4D2 Stats Calculation Rules - Edit these values without rebuilding the API",
+  "_version": "1.0.0",
+  "_last_updated": "2025-07-14",
+  
+  "mvp_calculation": {
+    "_description": "MVP ranking criteria for campaigns (in priority order)",
+    "criteria": [
+      {
+        "field": "SpecialInfectedKills",
+        "direction": "desc",
+        "priority": 1,
+        "description": "Special Infected Killed (highest)"
+      },
+      {
+        "field": "SurvivorFFCount", 
+        "direction": "asc",
+        "priority": 2,
+        "description": "Friendly Fire Count (lowest)"
+      },
+      {
+        "field": "ZombieKills",
+        "direction": "desc", 
+        "priority": 3,
+        "description": "Zombie Kills (highest)"
+      },
+      {
+        "field": "DamageTaken",
+        "direction": "asc",
+        "priority": 4,
+        "description": "Damage Taken (lowest)"
+      },
+      {
+        "field": "SurvivorDamage",
+        "direction": "asc",
+        "priority": 5,
+        "description": "Friendly Fire Damage (lowest)"
+      }
+    ]
+  },
+
+  "top_weapon_calculation": {
+    "_description": "How to determine player's top weapon",
+    "source_table": "stats_weapons_usage",
+    "criteria": {
+      "field": "minutesUsed",
+      "direction": "desc",
+      "description": "Most time used weapon"
+    },
+    "alternative_criteria": [
+      {
+        "field": "totalDamage",
+        "direction": "desc",
+        "description": "Most damage dealt weapon"
+      },
+      {
+        "field": "kills",
+        "direction": "desc", 
+        "description": "Most kills weapon"
+      }
+    ]
+  },
+
+  "map_classification": {
+    "_description": "How to classify official vs custom maps",
+    "official_map_pattern": "^c[0-9]+m",
+    "custom_map_pattern": "NOT RLIKE \"^c[0-9]+m\""
+  },
+
+  "pagination": {
+    "_description": "Default pagination settings",
+    "campaigns_per_page": 4,
+    "sessions_per_page": 10,
+    "points_per_page": 50,
+    "max_per_page": 100
+  },
+
+  "cache_durations": {
+    "_description": "Cache durations in seconds for different endpoints",
+    "campaign_values": 600,
+    "campaign_details": 120,
+    "campaign_list": 60,
+    "user_averages": 120,
+    "user_image": 600,
+    "user_top": 60,
+    "user_random": 86400
+  },
+
+  "defaults": {
+    "_description": "Default values for various calculations",
+    "server_tag_default": "prod",
+    "gamemode_search_all": "%"
+  },
+
+  "query_limits": {
+    "_description": "Query result limits",
+    "top_session_limit": 10,
+    "minimum_session_duration": 300
+  }
+}
