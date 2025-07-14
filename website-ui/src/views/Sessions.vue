@@ -38,11 +38,20 @@
                 <b-table-column v-slot="props" field="map" label="Map">
                     {{ getMapName(props.row.map) }}
                 </b-table-column>
-                <b-table-column v-slot="props" field="survivorDamage" label="Friendly Fire" centered cell-class="number-cell">
-                    {{ props.row.SurvivorDamage | formatNumber }}
+                <b-table-column v-slot="props" field="SpecialInfectedKills" label="Special Kills" centered cell-class="number-cell">
+                    {{ props.row.SpecialInfectedKills | formatNumber }}
+                </b-table-column>
+                <b-table-column v-slot="props" field="SurvivorFFCount" label="FF Count" centered cell-class="number-cell">
+                    {{ props.row.SurvivorFFCount | formatNumber }}
+                </b-table-column>
+                <b-table-column v-slot="props" field="ZombieKills" label="Zombie Kills" centered cell-class="number-cell">
+                    {{ props.row.ZombieKills | formatNumber }}
                 </b-table-column>
                 <b-table-column v-slot="props" field="DamageTaken" label="Damage Taken" centered cell-class="number-cell">
                     {{ props.row.DamageTaken | formatNumber }}
+                </b-table-column>
+                <b-table-column v-slot="props" field="SurvivorDamage" label="Friendly Fire" centered cell-class="number-cell">
+                    {{ props.row.SurvivorDamage | formatNumber }}
                 </b-table-column>
                 <b-table-column v-slot="props" field="MedkitsUsed" label="Medkits Used" centered cell-class="number-cell">
                     {{ props.row.MedkitsUsed | formatNumber }}
@@ -53,11 +62,11 @@
                 <b-table-column v-slot="props" label="Total Pills/Shots Used" centered cell-class="number-cell">
                     {{ getPillShotCount(props.row) | formatNumber }}
                 </b-table-column>
-                <b-table-column v-slot="props" field="incaps" label="Incaps" centered cell-class="number-cell">
-                    {{ props.row.incaps | formatNumber }}
+                <b-table-column v-slot="props" field="Incaps" label="Incaps" centered cell-class="number-cell">
+                    {{ props.row.Incaps | formatNumber }}
                 </b-table-column>
-                <b-table-column v-slot="props" field="deaths" label="Deaths" centered cell-class="number-cell">
-                    {{ props.row.deaths | formatNumber }}
+                <b-table-column v-slot="props" field="Deaths" label="Deaths" centered cell-class="number-cell">
+                    {{ props.row.Deaths | formatNumber }}
                 </b-table-column>
                 <b-table-column v-slot="props" field="difficulty" label="Difficulty" centered>
                     {{ formatDifficulty(props.row.difficulty) }}
