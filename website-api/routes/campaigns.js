@@ -78,26 +78,42 @@ export default function(pool) {
 
             const [total] = await pool.execute("SELECT COUNT(DISTINCT campaignID) as total FROM `stats_games`")
             const [recent] = await pool.execute(`
-                SELECT COUNT(g.campaignID) as playerCount, 
+                SELECT COUNT(g.campaignID) as playerCount,
                     g.campaignID,
-                    g.map, 
-                    g.date_start, 
-                    g.date_end, 
-                    difficulty, 
-                    gamemode,SUM(ZombieKills) as CommonsKilled, 
-                    SUM(SurvivorDamage) as FF, 
-                    SUM(Deaths) as Deaths, 
-                    SUM(MedkitsUsed), 
-                    (SUM(MolotovsUsed) + SUM(PipebombsUsed) + SUM(BoomerBilesUsed)) as ThrowableTotal, 
+                    g.map,
+                    MIN(g.date_start) as date_start,
+                    MAX(g.date_end) as date_end,
+                    AVG(g.duration) * 60 as duration_seconds,
+                    difficulty,
+                    gamemode,
+                    SUM(g.ZombieKills) as CommonsKilled,
+                    SUM(g.SurvivorFFDamage) as FF,
+                    SUM(g.Deaths) as Deaths,
+                    SUM(g.MedkitsUsed) as MedkitsUsed,
+                    SUM(COALESCE(g.boomer_kills, 0) + COALESCE(g.smoker_kills, 0) + COALESCE(g.jockey_kills, 0) + COALESCE(g.hunter_kills, 0) + COALESCE(g.spitter_kills, 0) + COALESCE(g.charger_kills, 0)) as SpecialInfectedKills,
+                    (SUM(g.MolotovsUsed) + SUM(g.PipebombsUsed) + SUM(g.BoomerBilesUsed)) as ThrowableTotal,
                     server_tags,
                     COALESCE(i.name, g.map) as map_name
-                FROM \`stats_games\` as g 
-                INNER JOIN \`stats_users\` ON g.steamid = \`stats_users\`.steamid 
+                FROM \`stats_games\` as g
+                INNER JOIN \`stats_users\` ON g.steamid = \`stats_users\`.steamid
                 LEFT JOIN map_info i ON i.mapid = g.map
                 WHERE (? = 'any' OR server_tags IS NULL OR server_tags = '' OR FIND_IN_SET(?, server_tags)) ${mapSearchString} AND gamemode LIKE ? AND (? IS NULL OR difficulty = ?)
-                GROUP BY g.campaignID 
-                ORDER BY date_end DESC LIMIT ?, ?`, 
+                GROUP BY g.campaignID
+                ORDER BY MAX(g.date_end) DESC LIMIT ?, ?`,
             [selectTag, selectTag, gamemodeSearchString, difficulty, difficulty, offset, perPage])
+
+            // Calculate MVP points for each campaign
+            recent.forEach(campaign => {
+                let mvpPoints = 0;
+
+                // Basic MVP calculation
+                mvpPoints += (campaign.SpecialInfectedKills || 0) * 6;
+                mvpPoints += (campaign.CommonsKilled || 0) * 1;
+                mvpPoints += (campaign.MedkitsUsed || 0) * 40;
+
+                campaign.mvpPoints = Math.round(mvpPoints);
+            });
+
             res.json({
                 meta: {
                     selectTag,
