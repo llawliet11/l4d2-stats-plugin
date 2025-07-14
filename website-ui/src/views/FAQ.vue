@@ -15,7 +15,7 @@
             <h5 class="title is-5">What is this?</h5>
             <p>This is a page for my <a href="https://github.com/Jackzmc/l4d2-stats-plugin">l4d2 stats plugin</a>. View information on how to set it up on the github linked. The plugin records kills, deaths, damage, skills and more from various left 4 dead game sessions and are displayed neatly on this website. This website is home to my personal servers I host, some for friends and some are public (see 'public' tags). </p>
             <hr>
-            <b-collapse :open="false" class="card" animation="slide">
+            <b-collapse :open="true" class="card" animation="slide">
                 <div
                     slot="trigger"
                     slot-scope="props"
@@ -65,7 +65,7 @@
                     </div>
                 </div>
             </b-collapse>
-            <b-collapse :open="false" class="card" animation="slide">
+            <b-collapse :open="true" class="card" animation="slide">
                             <div
                     slot="trigger"
                     slot-scope="props"
