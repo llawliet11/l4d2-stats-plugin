@@ -30,7 +30,10 @@
                     <b-button tag="router-link" :to="'/sessions/details/' + props.row.id" expanded  :style="'background-color:' + getRGB(props.row.campaignID)"> View</b-button>
                 </b-table-column>
                 <b-table-column v-slot="props" field="steamid" label="User">
-                    <router-link :to='"/user/" + props.row.steamid'><b>{{props.row.last_alias}}</b></router-link>
+                    <router-link :to='"/user/" + props.row.steamid'>
+                        <b>{{props.row.last_alias}}</b>
+                        <span v-if="props.row.isMVP" class="mvp-badge">MVP</span>
+                    </router-link>
                 </b-table-column>
                 <b-table-column v-slot="props" field="map" label="Map">
                     {{ getMapName(props.row.map) }}
@@ -161,5 +164,14 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 }
 .table td {
     vertical-align: middle;;
+}
+.mvp-badge {
+    background-color: #ffdd57;
+    color: #363636;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 6px;
 }
 </style>
