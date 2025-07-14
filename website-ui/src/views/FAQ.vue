@@ -79,6 +79,7 @@
                             <li>Survivor FF Count <em>(lowest number)</em></li>
                             <li>Zombie Kills <em>(highest number)</em></li>
                             <li>Damage Taken <em>(lowest number)</em></li>
+                            <li>Friendly Fire<em>(lowest number)</em></li>
                         </ol>
                         <p>When a campaign is fetched, the list of sessions for that campaign are sorted in the order listed above. The first player in the list will be assigned the MVP.</p>
                     </div>

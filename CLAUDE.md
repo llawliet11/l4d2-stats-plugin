@@ -132,3 +132,7 @@ The system tracks comprehensive L4D2 gameplay statistics including:
 ## Development Notes
 
 - There is no need to compile. I will do manually
+
+## SSH and Git Workflow
+
+- When accessing ssh-homelab mcp for the left4dead2-stats project, always do a `git pull` first to get all updates
