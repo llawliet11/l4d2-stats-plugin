@@ -7,3 +7,5 @@ databases.cfg
 .scripts
 .env.production
 .idea
+
+reports
