@@ -303,14 +303,66 @@ export default function(pool) {
                 ORDER BY MAX(g.date_end) DESC LIMIT ?, ?`,
             [selectTag, selectTag, gamemodeSearchString, difficulty, difficulty, offset, perPage])
 
-            // Calculate MVP points for each campaign
+            // For each campaign, check if we have stats_map_users data and use it if available
+            for (let campaign of recent) {
+                if (campaign.map) {
+                    const [mapUserStats] = await pool.execute(`
+                        SELECT
+                            COUNT(DISTINCT smu.steamid) as playerCount,
+                            MIN(smu.session_start) as date_start,
+                            MAX(smu.session_end) as date_end,
+                            SUM(smu.session_end - smu.session_start) as duration_seconds,
+                            SUM(smu.common_kills) as CommonsKilled,
+                            SUM(smu.survivor_damage_give) as FF,
+                            SUM(smu.survivor_deaths) as Deaths,
+                            SUM(smu.heal_others) as MedkitsUsed,
+                            SUM(COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) +
+                                COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) +
+                                COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as SpecialInfectedKills,
+                            SUM(COALESCE(smu.throws_molotov,0) + COALESCE(smu.throws_pipe,0) + COALESCE(smu.throws_puke,0)) as ThrowableTotal
+                        FROM stats_map_users smu
+                        WHERE smu.mapid = ?
+                    `, [campaign.map])
+
+                    // If we have map user stats, use them instead of stats_games data
+                    if (mapUserStats.length > 0 && mapUserStats[0].playerCount > 0) {
+                        const mapStats = mapUserStats[0]
+                        campaign.playerCount = mapStats.playerCount
+                        campaign.date_start = mapStats.date_start
+                        campaign.date_end = mapStats.date_end
+                        campaign.duration_seconds = mapStats.duration_seconds?.toString() || campaign.duration_seconds
+                        campaign.CommonsKilled = mapStats.CommonsKilled?.toString() || "0"
+                        campaign.FF = mapStats.FF?.toString() || "0"
+                        campaign.Deaths = mapStats.Deaths?.toString() || "0"
+                        campaign.MedkitsUsed = mapStats.MedkitsUsed?.toString() || "0"
+                        campaign.SpecialInfectedKills = mapStats.SpecialInfectedKills?.toString() || "0"
+                        campaign.ThrowableTotal = mapStats.ThrowableTotal?.toString() || "0"
+                    }
+                }
+            }
+
+            // Calculate MVP points for each campaign using the updated data
             recent.forEach(campaign => {
                 let mvpPoints = 0;
 
-                // Basic MVP calculation
-                mvpPoints += (campaign.SpecialInfectedKills || 0) * 6;
-                mvpPoints += (campaign.CommonsKilled || 0) * 1;
-                mvpPoints += (campaign.MedkitsUsed || 0) * 40;
+                // Enhanced MVP calculation using comprehensive criteria
+                const pointValues = {
+                    positive_actions: {
+                        special_kill: 6, common_kill: 1, tank_kill_max: 100, witch_kill: 15,
+                        heal_teammate: 40, revive_teammate: 25, defib_teammate: 30, finale_win: 1000,
+                        molotov_use: 5, pipe_use: 5, bile_use: 5, pill_use: 10, adrenaline_use: 15
+                    },
+                    penalties: { teammate_kill: -100, ff_damage_multiplier: -2 }
+                };
+
+                // Positive actions
+                mvpPoints += parseInt(campaign.SpecialInfectedKills || 0) * pointValues.positive_actions.special_kill;
+                mvpPoints += parseInt(campaign.CommonsKilled || 0) * pointValues.positive_actions.common_kill;
+                mvpPoints += parseInt(campaign.MedkitsUsed || 0) * pointValues.positive_actions.heal_teammate;
+                mvpPoints += parseInt(campaign.ThrowableTotal || 0) * pointValues.positive_actions.molotov_use; // Average throwable value
+
+                // Penalties for friendly fire
+                mvpPoints += parseInt(campaign.FF || 0) * pointValues.penalties.ff_damage_multiplier;
 
                 campaign.mvpPoints = Math.round(mvpPoints);
             });
@@ -326,7 +378,7 @@ export default function(pool) {
                 total_campaigns: total[0].total
             })
         }catch(err) {
-            console.error('[/api/user/:user]',err.stack);
+            console.error('[/api/campaigns]',err.stack);
             res.status(500).json({error:"Internal Server Error"})
         }
     })
