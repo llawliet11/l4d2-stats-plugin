@@ -312,6 +312,9 @@ enum struct Player {
 	int idleStartTime;
 	int totalIdleTime;
 
+	// Map session tracking for stats_map_users
+	int mapSessionStart;
+
 	ArrayList pointsQueue;
 	ArrayList pendingHeatmaps;
 
@@ -642,7 +645,7 @@ public void OnClientDisconnect(int client) {
 		if(game.finished && game.uuid[0] && players[client].steamid[0]) {
 			IncrementSessionStat(client);
 			RecordCampaign(client);
-			IncrementStat(client, "finales_won", 1);
+			IncrementBothStats(client, "finales_won", 1);
 			players[client].RecordPoint(PType_FinishCampaign, 1000);
 		}
 		
@@ -738,6 +741,9 @@ void SetupUserInDB(int client, const char steamid[32]) {
 		strcopy(players[client].steamid, 32, steamid);
 		players[client].startedPlaying = GetTime();
 		
+		// Initialize map session tracking
+		players[client].mapSessionStart = GetTime();
+		
 		PrintToServer("[l4d2_stats_recorder] Setting up user %N with Steam ID: %s", client, steamid);
 		
 		char query[256];
@@ -765,6 +771,43 @@ void IncrementStat(int client, const char[] name, int amount = 1, bool lowPriori
 			Format(query, sizeof(query), "UPDATE stats_users SET `%s`=`%s`+%d WHERE steamid='%s'", escaped_name, escaped_name, amount, players[client].steamid);
 			#if defined DEBUG
 			PrintToServer("[Debug] Updating Stat %s (+%d) for %N (%d) [%s]", name, amount, client, client, players[client].steamid);
+			#endif 
+			SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, lowPriority ? DBPrio_Low : DBPrio_Normal);
+		}
+	}
+}
+
+//Increments both lifetime and map-specific statistics
+void IncrementBothStats(int client, const char[] name, int amount = 1, bool lowPriority = true) {
+	IncrementStat(client, name, amount, lowPriority);    // Lifetime stats
+	IncrementMapStat(client, name, amount, lowPriority); // Map-specific stats
+}
+
+//Increments a map-specific statistic for stats_map_users table
+void IncrementMapStat(int client, const char[] name, int amount = 1, bool lowPriority = true) {
+	if(client > 0 && !IsFakeClient(client) && IsClientConnected(client)) {
+		if (players[client].steamid[0] && game.mapId[0] && players[client].mapSessionStart > 0) {
+			if(g_db == INVALID_HANDLE) {
+				LogError("Database handle is invalid.");
+				return;
+			}
+			int escaped_name_size = 2*strlen(name)+1;
+			char[] escaped_name = new char[escaped_name_size];
+			char query[512];
+			g_db.Escape(name, escaped_name, escaped_name_size);
+			
+			// Insert or update the map session stats
+			// For insert, we need to get user data from stats_users first
+			Format(query, sizeof(query), 
+				"INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, %s, session_end) "
+				"SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, %d, UNIX_TIMESTAMP() "
+				"FROM stats_users WHERE steamid = '%s' "
+				"ON DUPLICATE KEY UPDATE stats_map_users.%s = stats_map_users.%s + %d, session_end = UNIX_TIMESTAMP()",
+				escaped_name, players[client].steamid, game.mapId, players[client].mapSessionStart, amount, players[client].steamid,
+				escaped_name, escaped_name, amount);
+			
+			#if defined DEBUG
+			PrintToServer("[Debug] Updating Map Stat %s (+%d) for %N on map %s [%s]", name, amount, client, game.mapId, players[client].steamid);
 			#endif 
 			SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, lowPriority ? DBPrio_Low : DBPrio_Normal);
 		}
@@ -1767,7 +1810,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
 		if(!IsFakeClient(victim)) {
 			if(victim_team == 2) {
-				IncrementStat(victim, "survivor_deaths", 1);
+				IncrementBothStats(victim, "survivor_deaths", 1);
 				float pos[3];
 				GetClientAbsOrigin(victim, pos);
 				players[victim].RecordHeatMap(HeatMap_Death, pos);
@@ -1784,7 +1827,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 				if(GetInfectedClassName(victim_class, class, sizeof(class))) {
 					IncrementSpecialKill(attacker, victim_class);
 					Format(statname, sizeof(statname), "kills_%s", class);
-					IncrementStat(attacker, statname, 1);
+					IncrementBothStats(attacker, statname, 1);
 					players[attacker].RecordPoint(PType_SpecialKill, 6);
 				}
 				char wpn_name[16];
@@ -1792,9 +1835,9 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 				if(StrEqual(wpn_name, "inferno", true) || StrEqual(wpn_name, "entityflame", true)) {
 					players[attacker].molotovKills++;
 				}
-				IncrementStat(victim, "infected_deaths", 1);
+				IncrementBothStats(victim, "infected_deaths", 1);
 			} else if(victim_team == 2) {
-				IncrementStat(attacker, "ff_kills", 1);
+				IncrementBothStats(attacker, "ff_kills", 1);
 				//30 point lost for killing teammate
 				players[attacker].RecordPoint(PType_FriendlyFire, -500);
 			}
@@ -1849,7 +1892,7 @@ public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast)
 				
 				if(points > 0) {
 					players[i].RecordPoint(PType_TankKill, points);
-					IncrementStat(i, "tanks_killed", 1);
+					IncrementBothStats(i, "tanks_killed", 1);
 					
 					#if defined DEBUG
 					PrintToServer("[DEBUG] Tank kill points: player=%d, damage=%d/%d (%.1f%%), points=%d", i, g_iTankDamage[i], totalTankDamage, damagePercent * 100.0, points);
@@ -1886,7 +1929,7 @@ public void Event_DoorOpened(Event event, const char[] name, bool dontBroadcast)
 void Event_PlayerIncap(Event event, const char[] name, bool dontBroadcast) {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if(!IsFakeClient(client) && GetClientTeam(client) == 2) {
-		IncrementStat(client, "survivor_incaps", 1);
+		IncrementBothStats(client, "survivor_incaps", 1);
 		float pos[3];
 		GetClientAbsOrigin(client, pos);
 		players[client].RecordHeatMap(HeatMap_Incap, pos);
@@ -1898,7 +1941,7 @@ void Event_LedgeGrab(Event event, const char[] name, bool dontBroadcast) {
 		float pos[3];
 		GetClientAbsOrigin(client, pos);
 		players[client].RecordHeatMap(HeatMap_LedgeGrab, pos);
-		IncrementStat(client, "survivor_incaps", 1);
+		IncrementBothStats(client, "survivor_incaps", 1);
 	}
 }
 //Track heals, or defibs
@@ -1933,18 +1976,18 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 					PrintToChat(client, "[Heal] No points awarded - %N has sufficient health (%d%%)", 
 						subject, healthPercent);
 				}
-				IncrementStat(client, "heal_others", 1);
+				IncrementBothStats(client, "heal_others", 1);
 			}
 		} else if(StrEqual(name, "revive_success", true)) {
 			int subject = GetClientOfUserId(event.GetInt("subject"));
 			if(subject != client) {
-				IncrementStat(client, "revived_others", 1);
+				IncrementBothStats(client, "revived_others", 1);
 				players[client].RecordPoint(PType_ReviveOther, 25);
-				IncrementStat(subject, "revived", 1);
+				IncrementBothStats(subject, "revived", 1);
 			}
 		} else if(StrEqual(name, "defibrillator_used", true)) {
 			players[client].RecordPoint(PType_ResurrectOther, 50);
-			IncrementStat(client, "defibs_used", 1);
+			IncrementBothStats(client, "defibs_used", 1);
 		} else{
 			IncrementStat(client, name, 1);
 		}
@@ -2081,6 +2124,14 @@ public void OnMapStart() {
 		game.difficulty = GetDifficultyInt();
 	}
 	game.GetMap();
+	
+	// Reset map session start time for all connected players
+	int currentTime = GetTime();
+	for(int i = 1; i <= MaxClients; i++) {
+		if(IsClientInGame(i) && !IsFakeClient(i) && players[i].steamid[0]) {
+			players[i].mapSessionStart = currentTime;
+		}
+	}
 }
 public void OnMapEnd() {
 	if(g_HeatMapEntities != null) delete g_HeatMapEntities;
@@ -2178,7 +2229,7 @@ void Event_FinaleWin(Event event, const char[] name, bool dontBroadcast) {
 				players[client].RecordPoint(PType_FinishCampaign, 1000);
 				IncrementSessionStat(client);
 				RecordCampaign(client);
-				IncrementStat(client, "finales_won", 1);
+				IncrementBothStats(client, "finales_won", 1);
 				if(game.uuid[0] != '\0')
 					// PrintToChat(client, "View this game's statistics at <your-domain>/c/%s", shortID);
 				if(game.clownHonks > 0) {
