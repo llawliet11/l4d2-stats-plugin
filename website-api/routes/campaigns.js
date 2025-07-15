@@ -459,10 +459,10 @@ export default function(pool) {
             const mapId = req.params.mapId;
 
             // Validate mapId parameter
-            if (!mapId || mapId.trim() === '') {
+            if (!mapId || mapId.trim() === '' || mapId === 'undefined' || mapId === 'null') {
                 return res.status(400).json({
                     error: "INVALID_MAP_ID",
-                    message: "Map ID is required"
+                    message: "Map ID is required and cannot be undefined or null"
                 });
             }
 

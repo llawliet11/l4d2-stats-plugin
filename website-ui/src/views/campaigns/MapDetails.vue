@@ -229,6 +229,19 @@ export default {
             this.error = null
 
             const mapId = this.$route.params.mapId
+
+            // Validate mapId parameter
+            if (!mapId || mapId.trim() === '' || mapId === 'undefined' || mapId === 'null') {
+                console.warn('Invalid mapId parameter:', mapId)
+                this.error = {
+                    error: 'INVALID_MAP_ID',
+                    message: 'Invalid map ID provided'
+                }
+                this.loading = false
+                document.title = `Invalid Map - L4D2 Stats Plugin`
+                return
+            }
+
             document.title = `Map Campaign Details - ${mapId} - L4D2 Stats Plugin`
 
             this.$http.get(`/api/campaigns/map/${mapId}`)
