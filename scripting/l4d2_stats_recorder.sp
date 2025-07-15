@@ -799,9 +799,9 @@ void IncrementMapStat(int client, const char[] name, int amount = 1, bool lowPri
 			// Insert or update the map session stats
 			// For insert, we need to get user data from stats_users first
 			Format(query, sizeof(query), 
-				"INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, %s, session_end) "
-				"SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, %d, UNIX_TIMESTAMP() "
-				"FROM stats_users WHERE steamid = '%s' "
+				"INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, %s, session_end) " ...
+				"SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, %d, UNIX_TIMESTAMP() " ...
+				"FROM stats_users WHERE steamid = '%s' " ...
 				"ON DUPLICATE KEY UPDATE stats_map_users.%s = stats_map_users.%s + %d, session_end = UNIX_TIMESTAMP()",
 				escaped_name, players[client].steamid, game.mapId, players[client].mapSessionStart, amount, players[client].steamid,
 				escaped_name, escaped_name, amount);
