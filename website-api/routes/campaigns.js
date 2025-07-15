@@ -187,26 +187,7 @@ export default function(pool) {
             
             const [rows] = await pool.query(query, params)
             
-            // Load MVP calculation rules
-            let calculationRules;
-            try {
-                const rulesPath = path.join(process.cwd(), 'config', 'calculation-rules.json');
-                const rulesData = fs.readFileSync(rulesPath, 'utf8');
-                calculationRules = JSON.parse(rulesData);
-            } catch (err) {
-                console.warn('[/api/campaigns/:id] Could not load calculation rules, using defaults:', err.message);
-                calculationRules = {
-                    mvp_calculation: {
-                        criteria: [
-                            { field: "SpecialInfectedKills", direction: "desc" },
-                            { field: "SurvivorFFCount", direction: "asc" },
-                            { field: "ZombieKills", direction: "desc" },
-                            { field: "DamageTaken", direction: "asc" },
-                            { field: "SurvivorDamage", direction: "asc" }
-                        ]
-                    }
-                };
-            }
+            // Use the already loaded calculationRules from the top level
             
             // Calculate MVP points for each user using the same logic as sessions API
             const pointValues = calculationRules.point_values || {
