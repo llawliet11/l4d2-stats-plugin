@@ -47,13 +47,107 @@ export default function(pool) {
             ]
             const orderBy = mvpCriteria.map(c => `${c.field} ${c.direction}`).join(', ')
             
-            const [rows] = await pool.query(
-                `SELECT \`stats_games\`.*, last_alias, points, i.name as map_name FROM \`stats_games\` INNER JOIN \`stats_users\` ON \`stats_games\`.steamid = \`stats_users\`.steamid INNER JOIN map_info i ON i.mapid = stats_games.map WHERE left(\`stats_games\`.campaignID, 8) = ? ORDER BY ${orderBy}`, 
-                [req.params.id.substring(0,8)]
-            )
+            let mapId = req.params.id
+            let sessionStart = null
+            let sessionEnd = null
+            
+            // Check if the ID looks like a campaign ID (8 chars or contains hyphens)
+            // If so, resolve it to a map ID and get session timing via stats_games table
+            if (req.params.id.length === 8 || req.params.id.includes('-')) {
+                let campaignQuery
+                let campaignParams
+                
+                if (req.params.id.length === 8) {
+                    // Short campaign ID format (first 8 chars)
+                    campaignQuery = `SELECT DISTINCT map, 
+                                     MIN(date_start) as session_start, 
+                                     MAX(date_end) as session_end 
+                                     FROM stats_games 
+                                     WHERE LEFT(campaignID, 8) = ? 
+                                     GROUP BY map`
+                    campaignParams = [req.params.id]
+                } else {
+                    // Full campaign UUID
+                    campaignQuery = `SELECT DISTINCT map, 
+                                     MIN(date_start) as session_start, 
+                                     MAX(date_end) as session_end 
+                                     FROM stats_games 
+                                     WHERE campaignID = ? 
+                                     GROUP BY map`
+                    campaignParams = [req.params.id]
+                }
+                
+                const [campaigns] = await pool.query(campaignQuery, campaignParams)
+                if (campaigns.length > 0) {
+                    mapId = campaigns[0].map
+                    sessionStart = campaigns[0].session_start
+                    sessionEnd = campaigns[0].session_end
+                } else {
+                    // No campaign found, return empty result
+                    return res.json([])
+                }
+            }
+            
+            let query, params
+            
+            if (sessionStart && sessionEnd) {
+                // Filter by session timeframe for campaign-specific stats
+                query = `SELECT 
+                    smu.*,
+                    su.last_alias,
+                    su.points,
+                    mi.name as map_name,
+                    -- Calculate fields for MVP compatibility
+                    (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) + 
+                     COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) + 
+                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as SpecialInfectedKills,
+                    smu.survivor_ff as SurvivorFFCount,
+                    smu.common_kills as ZombieKills,
+                    smu.survivor_damage_rec as DamageTaken,
+                    smu.survivor_damage_give as SurvivorDamage,
+                    smu.survivor_deaths as Deaths,
+                    smu.survivor_incaps as Incaps,
+                    smu.pills_used as MedkitsUsed,
+                    (smu.pickups_pipe_bomb + smu.pickups_molotov + smu.throws_puke) as TotalThrowables,
+                    smu.pickups_pain_pills as TotalPillsShots
+                FROM stats_map_users smu
+                INNER JOIN stats_users su ON smu.steamid = su.steamid
+                INNER JOIN map_info mi ON smu.mapid = mi.mapid
+                WHERE smu.mapid = ? AND smu.session_start >= ? AND smu.session_end <= ?
+                ORDER BY ${orderBy}`
+                params = [mapId, sessionStart, sessionEnd]
+            } else {
+                // Fallback to all map sessions if no specific timeframe
+                query = `SELECT 
+                    smu.*,
+                    su.last_alias,
+                    su.points,
+                    mi.name as map_name,
+                    -- Calculate fields for MVP compatibility
+                    (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) + 
+                     COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) + 
+                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as SpecialInfectedKills,
+                    smu.survivor_ff as SurvivorFFCount,
+                    smu.common_kills as ZombieKills,
+                    smu.survivor_damage_rec as DamageTaken,
+                    smu.survivor_damage_give as SurvivorDamage,
+                    smu.survivor_deaths as Deaths,
+                    smu.survivor_incaps as Incaps,
+                    smu.pills_used as MedkitsUsed,
+                    (smu.pickups_pipe_bomb + smu.pickups_molotov + smu.throws_puke) as TotalThrowables,
+                    smu.pickups_pain_pills as TotalPillsShots
+                FROM stats_map_users smu
+                INNER JOIN stats_users su ON smu.steamid = su.steamid
+                INNER JOIN map_info mi ON smu.mapid = mi.mapid
+                WHERE smu.mapid = ?
+                ORDER BY ${orderBy}`
+                params = [mapId]
+            }
+            
+            const [rows] = await pool.query(query, params)
             res.json(rows)
         }catch(err) {
-            console.error('[/api/user/:user]',err.message);
+            console.error('[/api/campaigns/:id]',err.message);
             res.status(500).json({error:"Internal Server Error"})
         }
     })
@@ -127,6 +221,76 @@ export default function(pool) {
         }catch(err) {
             console.error('[/api/user/:user]',err.stack);
             res.status(500).json({error:"Internal Server Error"})
+        }
+    })
+    
+    // New endpoint: Get user statistics for a specific map
+    router.get('/maps/:mapid/users', routeCache.cacheSeconds(120), async(req, res) => {
+        try {
+            const mvpCriteria = calculationRules.mvp_calculation?.criteria || [
+                { field: "SpecialInfectedKills", direction: "desc" },
+                { field: "SurvivorFFCount", direction: "asc" },
+                { field: "ZombieKills", direction: "desc" },
+                { field: "DamageTaken", direction: "asc" },
+                { field: "SurvivorDamage", direction: "asc" }
+            ]
+            const orderBy = mvpCriteria.map(c => `${c.field} ${c.direction}`).join(', ')
+            
+            const [users] = await pool.query(`
+                SELECT 
+                    smu.*,
+                    su.last_alias,
+                    su.points,
+                    mi.name as map_name,
+                    mi.chapter_count,
+                    FROM_UNIXTIME(smu.session_start) as session_start_time,
+                    FROM_UNIXTIME(smu.session_end) as session_end_time,
+                    -- Calculate fields for MVP compatibility
+                    (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) + 
+                     COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) + 
+                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as SpecialInfectedKills,
+                    smu.survivor_ff as SurvivorFFCount,
+                    smu.common_kills as ZombieKills,
+                    smu.survivor_damage_rec as DamageTaken,
+                    smu.survivor_damage_give as SurvivorDamage
+                FROM stats_map_users smu
+                JOIN stats_users su ON smu.steamid = su.steamid
+                LEFT JOIN map_info mi ON mi.mapid = smu.mapid
+                WHERE smu.mapid = ?
+                ORDER BY ${orderBy}
+            `, [req.params.mapid])
+            
+            res.json({ users })
+        } catch(err) {
+            console.error('[/api/campaigns/maps/:mapid/users]', err.message)
+            res.status(500).json({error: "Internal Server Error"})
+        }
+    })
+    
+    // New endpoint: Get map statistics for a specific user
+    router.get('/users/:steamid/maps', routeCache.cacheSeconds(120), async(req, res) => {
+        try {
+            const [mapStats] = await pool.query(`
+                SELECT 
+                    smu.*,
+                    mi.name as map_name,
+                    mi.chapter_count,
+                    FROM_UNIXTIME(smu.session_start) as session_start_time,
+                    FROM_UNIXTIME(smu.session_end) as session_end_time,
+                    -- Calculate derived fields
+                    (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) + 
+                     COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) + 
+                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as SpecialInfectedKills
+                FROM stats_map_users smu
+                LEFT JOIN map_info mi ON mi.mapid = smu.mapid
+                WHERE smu.steamid = ?
+                ORDER BY smu.session_start DESC
+            `, [req.params.steamid])
+            
+            res.json({ mapStats })
+        } catch(err) {
+            console.error('[/api/campaigns/users/:steamid/maps]', err.message)
+            res.status(500).json({error: "Internal Server Error"})
         }
     })
     
