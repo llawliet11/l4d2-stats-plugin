@@ -120,7 +120,7 @@
                     </div>
                 </nav>
 
-                <div class="tile is-ancestor">
+                <div class="tile is-ancestor mt-5">
                     <div class="tile is-vertical">
                         <div class="tile">
                             <div class="tile is-parent is-vertical">
