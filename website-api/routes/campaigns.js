@@ -436,12 +436,12 @@ export default function(pool) {
                     smu.mapid,
                     smu.session_start,
                     smu.session_end,
-                    smu.ping,
+                    NULL as ping,
                     smu.common_kills,
                     smu.melee_kills,
                     smu.survivor_damage_rec as damage_taken,
                     smu.survivor_ff as friendly_fire_count,
-                    smu.survivor_ff_damage as friendly_fire_damage,
+                    smu.survivor_ff_rec as friendly_fire_damage,
                     smu.pickups_molotov as molotovs_used,
                     smu.pickups_pipe_bomb as pipebombs_used,
                     smu.boomer_mellos as biles_used,
@@ -507,10 +507,11 @@ export default function(pool) {
                 aggregatedStats.total_deaths += player.deaths || 0;
                 aggregatedStats.total_honks += player.total_honks || 0;
 
-                if (player.ping && player.ping > 0) {
-                    totalPing += player.ping;
-                    validPingCount++;
-                }
+                // Skip ping calculation since it's not available in stats_map_users
+                // if (player.ping && player.ping > 0) {
+                //     totalPing += player.ping;
+                //     validPingCount++;
+                // }
 
                 if (player.session_duration_minutes && player.session_duration_minutes > 0) {
                     totalDuration += player.session_duration_minutes;
@@ -519,7 +520,7 @@ export default function(pool) {
             });
 
             // Calculate averages
-            aggregatedStats.avg_ping = validPingCount > 0 ? Math.round(totalPing / validPingCount) : 0;
+            aggregatedStats.avg_ping = 0; // Not available in stats_map_users
             aggregatedStats.avg_session_duration = validDurationCount > 0 ?
                 Math.round((totalDuration / validDurationCount) * 10) / 10 : 0;
 
