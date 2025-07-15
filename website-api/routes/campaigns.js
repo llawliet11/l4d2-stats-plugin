@@ -91,9 +91,9 @@ export default function(pool) {
             let query, params
             
             if (sessionStart && sessionEnd) {
-                // Filter by session timeframe for campaign-specific stats
+                // Use stats_games for individual player session data
                 query = `SELECT 
-                    smu.*,
+                    sg.steamid,
                     su.last_alias,
                     su.points,
                     mi.name as map_name,
@@ -101,88 +101,91 @@ export default function(pool) {
                     FROM_UNIXTIME(sg.date_start) as date_played,
                     sg.date_start,
                     sg.date_end,
-                    -- Calculate fields for MVP compatibility
-                    (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) + 
-                     COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) + 
-                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as SpecialInfectedKills,
-                    smu.survivor_ff as SurvivorFFCount,
-                    smu.common_kills as ZombieKills,
-                    smu.survivor_damage_rec as DamageTaken,
-                    smu.survivor_damage_give as SurvivorDamage,
-                    smu.survivor_deaths as Deaths,
-                    smu.survivor_incaps as Incaps,
-                    -- CORRECTED FIELD MAPPINGS:
-                    smu.heal_others as MedkitsUsed,
-                    smu.melee_kills as MeleeKills,
-                    (smu.throws_molotov + smu.throws_pipe + smu.throws_puke) as TotalThrowables,
-                    (smu.pills_used + smu.adrenaline_used) as TotalPillsShots,
+                    sg.campaignID,
+                    sg.map,
+                    sg.difficulty,
+                    sg.gamemode,
+                    -- Calculate fields for MVP compatibility using stats_games data
+                    (COALESCE(sg.boomer_kills,0) + COALESCE(sg.smoker_kills,0) + 
+                     COALESCE(sg.jockey_kills,0) + COALESCE(sg.hunter_kills,0) + 
+                     COALESCE(sg.spitter_kills,0) + COALESCE(sg.charger_kills,0)) as SpecialInfectedKills,
+                    sg.SurvivorFFCount,
+                    sg.ZombieKills,
+                    sg.DamageTaken,
+                    sg.SurvivorDamage,
+                    sg.Deaths,
+                    sg.Incaps,
+                    sg.MedkitsUsed,
+                    sg.MeleeKills,
+                    (sg.MolotovsUsed + sg.PipebombsUsed + sg.BoomerBilesUsed) as TotalThrowables,
+                    (sg.PillsUsed + sg.AdrenalineUsed) as TotalPillsShots,
                     -- Individual throwable/consumable data for MVP calculation
-                    smu.throws_molotov,
-                    smu.throws_pipe,
-                    smu.throws_puke,
-                    smu.pills_used,
-                    smu.adrenaline_used,
-                    -- Additional MVP factors
-                    smu.tanks_killed,
-                    smu.kills_witch,
-                    smu.ff_kills,
-                    smu.revived_others,
-                    smu.defibs_used,
-                    smu.finales_won
-                FROM stats_map_users smu
-                INNER JOIN stats_users su ON smu.steamid = su.steamid
-                INNER JOIN map_info mi ON smu.mapid = mi.mapid
-                LEFT JOIN stats_games sg ON sg.steamid = smu.steamid 
-                    AND sg.map = smu.mapid 
-                    AND sg.campaignID LIKE CONCAT(?, '%')
-                WHERE smu.mapid = ? AND smu.session_start >= ? AND smu.session_end <= ?
+                    sg.MolotovsUsed as throws_molotov,
+                    sg.PipebombsUsed as throws_pipe,
+                    sg.BoomerBilesUsed as throws_puke,
+                    sg.PillsUsed as pills_used,
+                    sg.AdrenalineUsed as adrenaline_used,
+                    -- Additional MVP factors from stats_games
+                    COALESCE(sg.tanks_killed, 0) as tanks_killed,
+                    COALESCE(sg.witch_kills, 0) as kills_witch,
+                    COALESCE(sg.ff_kills, 0) as ff_kills,
+                    COALESCE(sg.revived_others, 0) as revived_others,
+                    COALESCE(sg.defibs_used, 0) as defibs_used,
+                    COALESCE(sg.finales_won, 0) as finales_won
+                FROM stats_games sg
+                INNER JOIN stats_users su ON sg.steamid = su.steamid
+                INNER JOIN map_info mi ON sg.map = mi.mapid
+                WHERE sg.campaignID LIKE CONCAT(?, '%')
                 ORDER BY ${orderBy}`
-                params = [req.params.id.substring(0,8), mapId, sessionStart, sessionEnd]
+                params = [req.params.id.substring(0,8)]
             } else {
-                // Fallback to all map sessions if no specific timeframe
+                // Fallback - use campaign/map ID directly with stats_games
                 query = `SELECT 
-                    smu.*,
+                    sg.steamid,
                     su.last_alias,
                     su.points,
                     mi.name as map_name,
-                    NULL as characterType,
-                    FROM_UNIXTIME(smu.session_start) as date_played,
-                    smu.session_start as date_start,
-                    smu.session_end as date_end,
-                    -- Calculate fields for MVP compatibility
-                    (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) + 
-                     COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) + 
-                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as SpecialInfectedKills,
-                    smu.survivor_ff as SurvivorFFCount,
-                    smu.common_kills as ZombieKills,
-                    smu.survivor_damage_rec as DamageTaken,
-                    smu.survivor_damage_give as SurvivorDamage,
-                    smu.survivor_deaths as Deaths,
-                    smu.survivor_incaps as Incaps,
-                    -- CORRECTED FIELD MAPPINGS:
-                    smu.heal_others as MedkitsUsed,
-                    smu.melee_kills as MeleeKills,
-                    (smu.throws_molotov + smu.throws_pipe + smu.throws_puke) as TotalThrowables,
-                    (smu.pills_used + smu.adrenaline_used) as TotalPillsShots,
+                    sg.characterType,
+                    FROM_UNIXTIME(sg.date_start) as date_played,
+                    sg.date_start,
+                    sg.date_end,
+                    sg.campaignID,
+                    sg.map,
+                    sg.difficulty,
+                    sg.gamemode,
+                    -- Calculate fields for MVP compatibility using stats_games data
+                    (COALESCE(sg.boomer_kills,0) + COALESCE(sg.smoker_kills,0) + 
+                     COALESCE(sg.jockey_kills,0) + COALESCE(sg.hunter_kills,0) + 
+                     COALESCE(sg.spitter_kills,0) + COALESCE(sg.charger_kills,0)) as SpecialInfectedKills,
+                    sg.SurvivorFFCount,
+                    sg.ZombieKills,
+                    sg.DamageTaken,
+                    sg.SurvivorDamage,
+                    sg.Deaths,
+                    sg.Incaps,
+                    sg.MedkitsUsed,
+                    sg.MeleeKills,
+                    (sg.MolotovsUsed + sg.PipebombsUsed + sg.BoomerBilesUsed) as TotalThrowables,
+                    (sg.PillsUsed + sg.AdrenalineUsed) as TotalPillsShots,
                     -- Individual throwable/consumable data for MVP calculation
-                    smu.throws_molotov,
-                    smu.throws_pipe,
-                    smu.throws_puke,
-                    smu.pills_used,
-                    smu.adrenaline_used,
-                    -- Additional MVP factors
-                    smu.tanks_killed,
-                    smu.kills_witch,
-                    smu.ff_kills,
-                    smu.revived_others,
-                    smu.defibs_used,
-                    smu.finales_won
-                FROM stats_map_users smu
-                INNER JOIN stats_users su ON smu.steamid = su.steamid
-                INNER JOIN map_info mi ON smu.mapid = mi.mapid
-                WHERE smu.mapid = ?
+                    sg.MolotovsUsed as throws_molotov,
+                    sg.PipebombsUsed as throws_pipe,
+                    sg.BoomerBilesUsed as throws_puke,
+                    sg.PillsUsed as pills_used,
+                    sg.AdrenalineUsed as adrenaline_used,
+                    -- Additional MVP factors from stats_games
+                    COALESCE(sg.tanks_killed, 0) as tanks_killed,
+                    COALESCE(sg.witch_kills, 0) as kills_witch,
+                    COALESCE(sg.ff_kills, 0) as ff_kills,
+                    COALESCE(sg.revived_others, 0) as revived_others,
+                    COALESCE(sg.defibs_used, 0) as defibs_used,
+                    COALESCE(sg.finales_won, 0) as finales_won
+                FROM stats_games sg
+                INNER JOIN stats_users su ON sg.steamid = su.steamid
+                INNER JOIN map_info mi ON sg.map = mi.mapid
+                WHERE sg.map = ? OR sg.campaignID LIKE CONCAT(?, '%')
                 ORDER BY ${orderBy}`
-                params = [mapId]
+                params = [mapId, req.params.id.substring(0,8)]
             }
             
             const [rows] = await pool.query(query, params)
