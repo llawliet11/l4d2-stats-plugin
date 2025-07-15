@@ -118,20 +118,20 @@ export default function(pool) {
                     sg.MedkitsUsed,
                     sg.MeleeKills,
                     (sg.MolotovsUsed + sg.PipebombsUsed + sg.BoomerBilesUsed) as TotalThrowables,
-                    (sg.PillsUsed + sg.AdrenalineUsed) as TotalPillsShots,
+                    (sg.PillsUsed + sg.AdrenalinesUsed) as TotalPillsShots,
                     -- Individual throwable/consumable data for MVP calculation
                     sg.MolotovsUsed as throws_molotov,
                     sg.PipebombsUsed as throws_pipe,
                     sg.BoomerBilesUsed as throws_puke,
                     sg.PillsUsed as pills_used,
-                    sg.AdrenalineUsed as adrenaline_used,
-                    -- Additional MVP factors from stats_games
-                    COALESCE(sg.tanks_killed, 0) as tanks_killed,
-                    COALESCE(sg.witch_kills, 0) as kills_witch,
-                    COALESCE(sg.ff_kills, 0) as ff_kills,
-                    COALESCE(sg.revived_others, 0) as revived_others,
-                    COALESCE(sg.defibs_used, 0) as defibs_used,
-                    COALESCE(sg.finales_won, 0) as finales_won
+                    sg.AdrenalinesUsed as adrenaline_used,
+                    -- Additional MVP factors from stats_games (using available fields)
+                    0 as tanks_killed,
+                    0 as kills_witch,
+                    0 as ff_kills,
+                    sg.ReviveOtherCount as revived_others,
+                    sg.DefibrillatorsUsed as defibs_used,
+                    0 as finales_won
                 FROM stats_games sg
                 INNER JOIN stats_users su ON sg.steamid = su.steamid
                 INNER JOIN map_info mi ON sg.map = mi.mapid
@@ -166,20 +166,20 @@ export default function(pool) {
                     sg.MedkitsUsed,
                     sg.MeleeKills,
                     (sg.MolotovsUsed + sg.PipebombsUsed + sg.BoomerBilesUsed) as TotalThrowables,
-                    (sg.PillsUsed + sg.AdrenalineUsed) as TotalPillsShots,
+                    (sg.PillsUsed + sg.AdrenalinesUsed) as TotalPillsShots,
                     -- Individual throwable/consumable data for MVP calculation
                     sg.MolotovsUsed as throws_molotov,
                     sg.PipebombsUsed as throws_pipe,
                     sg.BoomerBilesUsed as throws_puke,
                     sg.PillsUsed as pills_used,
-                    sg.AdrenalineUsed as adrenaline_used,
-                    -- Additional MVP factors from stats_games
-                    COALESCE(sg.tanks_killed, 0) as tanks_killed,
-                    COALESCE(sg.witch_kills, 0) as kills_witch,
-                    COALESCE(sg.ff_kills, 0) as ff_kills,
-                    COALESCE(sg.revived_others, 0) as revived_others,
-                    COALESCE(sg.defibs_used, 0) as defibs_used,
-                    COALESCE(sg.finales_won, 0) as finales_won
+                    sg.AdrenalinesUsed as adrenaline_used,
+                    -- Additional MVP factors from stats_games (using available fields)
+                    0 as tanks_killed,
+                    0 as kills_witch,
+                    0 as ff_kills,
+                    sg.ReviveOtherCount as revived_others,
+                    sg.DefibrillatorsUsed as defibs_used,
+                    0 as finales_won
                 FROM stats_games sg
                 INNER JOIN stats_users su ON sg.steamid = su.steamid
                 INNER JOIN map_info mi ON sg.map = mi.mapid
