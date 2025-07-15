@@ -8,4 +8,7 @@ databases.cfg
 .env.production
 .idea
 
-reports
+# Backup files containing personal information
+backups/
+
+reportsex
