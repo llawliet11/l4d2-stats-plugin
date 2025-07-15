@@ -97,6 +97,10 @@ export default function(pool) {
                     su.last_alias,
                     su.points,
                     mi.name as map_name,
+                    sg.characterType,
+                    FROM_UNIXTIME(sg.date_start) as date_played,
+                    sg.date_start,
+                    sg.date_end,
                     -- Calculate fields for MVP compatibility
                     (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) + 
                      COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) + 
@@ -107,15 +111,33 @@ export default function(pool) {
                     smu.survivor_damage_give as SurvivorDamage,
                     smu.survivor_deaths as Deaths,
                     smu.survivor_incaps as Incaps,
-                    smu.pills_used as MedkitsUsed,
-                    (smu.pickups_pipe_bomb + smu.pickups_molotov + smu.throws_puke) as TotalThrowables,
-                    smu.pickups_pain_pills as TotalPillsShots
+                    -- CORRECTED FIELD MAPPINGS:
+                    smu.heal_others as MedkitsUsed,
+                    smu.melee_kills as MeleeKills,
+                    (smu.throws_molotov + smu.throws_pipe + smu.throws_puke) as TotalThrowables,
+                    (smu.pills_used + smu.adrenaline_used) as TotalPillsShots,
+                    -- Individual throwable/consumable data for MVP calculation
+                    smu.throws_molotov,
+                    smu.throws_pipe,
+                    smu.throws_puke,
+                    smu.pills_used,
+                    smu.adrenaline_used,
+                    -- Additional MVP factors
+                    smu.tanks_killed,
+                    smu.kills_witch,
+                    smu.ff_kills,
+                    smu.revived_others,
+                    smu.defibs_used,
+                    smu.finales_won
                 FROM stats_map_users smu
                 INNER JOIN stats_users su ON smu.steamid = su.steamid
                 INNER JOIN map_info mi ON smu.mapid = mi.mapid
+                LEFT JOIN stats_games sg ON sg.steamid = smu.steamid 
+                    AND sg.map = smu.mapid 
+                    AND sg.campaignID LIKE CONCAT(?, '%')
                 WHERE smu.mapid = ? AND smu.session_start >= ? AND smu.session_end <= ?
                 ORDER BY ${orderBy}`
-                params = [mapId, sessionStart, sessionEnd]
+                params = [req.params.id.substring(0,8), mapId, sessionStart, sessionEnd]
             } else {
                 // Fallback to all map sessions if no specific timeframe
                 query = `SELECT 
@@ -123,6 +145,10 @@ export default function(pool) {
                     su.last_alias,
                     su.points,
                     mi.name as map_name,
+                    NULL as characterType,
+                    FROM_UNIXTIME(smu.session_start) as date_played,
+                    smu.session_start as date_start,
+                    smu.session_end as date_end,
                     -- Calculate fields for MVP compatibility
                     (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) + 
                      COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) + 
@@ -133,9 +159,24 @@ export default function(pool) {
                     smu.survivor_damage_give as SurvivorDamage,
                     smu.survivor_deaths as Deaths,
                     smu.survivor_incaps as Incaps,
-                    smu.pills_used as MedkitsUsed,
-                    (smu.pickups_pipe_bomb + smu.pickups_molotov + smu.throws_puke) as TotalThrowables,
-                    smu.pickups_pain_pills as TotalPillsShots
+                    -- CORRECTED FIELD MAPPINGS:
+                    smu.heal_others as MedkitsUsed,
+                    smu.melee_kills as MeleeKills,
+                    (smu.throws_molotov + smu.throws_pipe + smu.throws_puke) as TotalThrowables,
+                    (smu.pills_used + smu.adrenaline_used) as TotalPillsShots,
+                    -- Individual throwable/consumable data for MVP calculation
+                    smu.throws_molotov,
+                    smu.throws_pipe,
+                    smu.throws_puke,
+                    smu.pills_used,
+                    smu.adrenaline_used,
+                    -- Additional MVP factors
+                    smu.tanks_killed,
+                    smu.kills_witch,
+                    smu.ff_kills,
+                    smu.revived_others,
+                    smu.defibs_used,
+                    smu.finales_won
                 FROM stats_map_users smu
                 INNER JOIN stats_users su ON smu.steamid = su.steamid
                 INNER JOIN map_info mi ON smu.mapid = mi.mapid
@@ -145,6 +186,88 @@ export default function(pool) {
             }
             
             const [rows] = await pool.query(query, params)
+            
+            // Load MVP calculation rules
+            let calculationRules;
+            try {
+                const rulesPath = path.join(process.cwd(), 'config', 'calculation-rules.json');
+                const rulesData = fs.readFileSync(rulesPath, 'utf8');
+                calculationRules = JSON.parse(rulesData);
+            } catch (err) {
+                console.warn('[/api/campaigns/:id] Could not load calculation rules, using defaults:', err.message);
+                calculationRules = {
+                    mvp_calculation: {
+                        criteria: [
+                            { field: "SpecialInfectedKills", direction: "desc" },
+                            { field: "SurvivorFFCount", direction: "asc" },
+                            { field: "ZombieKills", direction: "desc" },
+                            { field: "DamageTaken", direction: "asc" },
+                            { field: "SurvivorDamage", direction: "asc" }
+                        ]
+                    }
+                };
+            }
+            
+            // Calculate MVP points for each user using the same logic as sessions API
+            const pointValues = calculationRules.point_values || {
+                positive_actions: {
+                    common_kill: 1, special_kill: 6, tank_kill_max: 100, witch_kill: 15,
+                    heal_teammate: 40, revive_teammate: 25, defib_teammate: 30, finale_win: 1000,
+                    molotov_use: 5, pipe_use: 5, bile_use: 5, pill_use: 10, adrenaline_use: 15
+                },
+                penalties: { teammate_kill: -100 }
+            };
+            
+            // Calculate average damage taken for bonus calculation
+            const totalDamageTaken = rows.reduce((sum, row) => sum + (row.DamageTaken || 0), 0);
+            const avgDamageTaken = rows.length > 0 ? totalDamageTaken / rows.length : 0;
+            
+            // Calculate MVP points for each user using comprehensive criteria
+            rows.forEach(row => {
+                let mvpPoints = 0;
+                
+                // Positive actions (using corrected data from stats_map_users)
+                mvpPoints += (row.SpecialInfectedKills || 0) * (pointValues.positive_actions.special_kill || 6);
+                mvpPoints += (row.ZombieKills || 0) * (pointValues.positive_actions.common_kill || 1);
+                mvpPoints += (row.tanks_killed || 0) * (pointValues.positive_actions.tank_kill_max || 100);
+                mvpPoints += (row.kills_witch || 0) * (pointValues.positive_actions.witch_kill || 15);
+                mvpPoints += (row.MedkitsUsed || 0) * (pointValues.positive_actions.heal_teammate || 40);
+                mvpPoints += (row.revived_others || 0) * (pointValues.positive_actions.revive_teammate || 25);
+                mvpPoints += (row.defibs_used || 0) * (pointValues.positive_actions.defib_teammate || 30);
+                mvpPoints += (row.finales_won || 0) * (pointValues.positive_actions.finale_win || 1000);
+                
+                // Additional positive actions
+                mvpPoints += (row.throws_molotov || 0) * (pointValues.positive_actions.molotov_use || 5);
+                mvpPoints += (row.throws_pipe || 0) * (pointValues.positive_actions.pipe_use || 5);
+                mvpPoints += (row.throws_puke || 0) * (pointValues.positive_actions.bile_use || 5);
+                mvpPoints += (row.pills_used || 0) * (pointValues.positive_actions.pill_use || 10);
+                mvpPoints += (row.adrenaline_used || 0) * (pointValues.positive_actions.adrenaline_use || 15);
+                
+                // Penalties
+                mvpPoints += (row.ff_kills || 0) * (pointValues.penalties.teammate_kill || -100);
+                mvpPoints -= (row.SurvivorDamage || 0) * 2; // -2 per friendly fire damage
+                
+                // Damage taken bonus (reward for taking less damage than average)
+                const damageTakenBonus = Math.max(0, (avgDamageTaken - (row.DamageTaken || 0)) * 0.5);
+                mvpPoints += damageTakenBonus;
+                
+                row.mvpPoints = Math.round(mvpPoints);
+                row.SurvivorFFCount = Math.round((row.SurvivorDamage || 0) / 10); // Estimate for display
+            });
+            
+            // Sort users by MVP points to determine overall MVP
+            const sortedUsers = [...rows].sort((a, b) => (b.mvpPoints || 0) - (a.mvpPoints || 0));
+            
+            // Mark the overall MVP (highest MVP points)
+            if (sortedUsers.length > 0) {
+                const mvpSteamId = sortedUsers[0].steamid;
+                rows.forEach(row => {
+                    if (row.steamid === mvpSteamId) {
+                        row.isMVP = true;
+                    }
+                });
+            }
+            
             res.json(rows)
         }catch(err) {
             console.error('[/api/campaigns/:id]',err.message);
