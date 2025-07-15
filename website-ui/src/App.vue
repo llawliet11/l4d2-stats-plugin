@@ -19,9 +19,6 @@
             <b-navbar-item tag="router-link" to="/maps">
                 Campaigns
             </b-navbar-item>
-            <b-navbar-item tag="router-link" to="/campaigns">
-                Games
-            </b-navbar-item>
             <b-navbar-item tag="router-link" to="/sessions">
                 Sessions
             </b-navbar-item>
@@ -32,9 +29,9 @@
 
         <template slot="end">
             <b-navbar-item>
-              <b-button 
-                type="is-warning" 
-                size="is-small" 
+              <b-button
+                type="is-warning"
+                size="is-small"
                 @click="recalculatePoints"
                 :loading="recalculating"
                 icon-left="refresh"
@@ -142,14 +139,14 @@ export default {
       this.recalculating = true
       try {
         const response = await this.$http.post('/api/recalculate')
-        
+
         if (response.data.success) {
           this.$buefy.toast.open({
             duration: 5000,
             message: `Points recalculated successfully! Processed ${response.data.stats.sessions_processed} sessions. Total points: ${response.data.stats.total_points}`,
             type: 'is-success'
           })
-          
+
           // Force refresh current page to show updated points
           this.$router.go(0)
         } else {

@@ -111,14 +111,11 @@
                             </td>
                             <td>
                                 <div class="buttons are-small">
-                                    <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" size="is-small">
-                                        Game
+                                    <b-button v-if="campaign.map" type="is-primary" tag="router-link" :to="'/campaigns/map/' + campaign.map" size="is-small" expanded>
+                                        Map Stats
                                     </b-button>
-                                    <b-button v-if="campaign.map" type="is-primary" tag="router-link" :to="'/campaigns/map/' + campaign.map" size="is-small">
-                                        Map
-                                    </b-button>
-                                    <b-button v-else type="is-primary" size="is-small" disabled>
-                                        Map
+                                    <b-button v-else type="is-primary" size="is-small" disabled expanded>
+                                        Map Stats
                                     </b-button>
                                 </div>
                             </td>
@@ -177,14 +174,11 @@
                             </div>
 
                             <div class="buttons">
-                                <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded size="is-small">
-                                    Game Details
-                                </b-button>
                                 <b-button v-if="campaign.map" type="is-primary" tag="router-link" :to="'/campaigns/map/' + campaign.map" expanded size="is-small">
-                                    Map Stats
+                                    View Map Statistics
                                 </b-button>
                                 <b-button v-else type="is-primary" expanded size="is-small" disabled>
-                                    Map Stats
+                                    View Map Statistics
                                 </b-button>
                             </div>
                         </div>

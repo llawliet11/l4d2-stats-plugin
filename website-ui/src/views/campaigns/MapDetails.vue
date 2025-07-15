@@ -7,7 +7,7 @@
                     <div v-if="mapData && !loading" class="column">
                         <nav class="breadcrumb has-arrow-separator" aria-label="breadcrumbs">
                             <ul>
-                                <li><router-link to="/campaigns">Games</router-link></li>
+                                <li><router-link to="/maps">Campaigns</router-link></li>
                                 <li class="is-active"><a href="#" aria-current="page">{{mapData.map.name || mapData.map.mapid}}</a></li>
                             </ul>
                         </nav>

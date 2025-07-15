@@ -181,8 +181,8 @@
                             </div>
                             <div v-if="userRecord.isMVP" class="mvp-stats">
                                 <small>
-                                    Specials: {{ userRecord.SpecialInfectedKills || 0 }} | 
-                                    FF: {{ userRecord.SurvivorFFCount || 0 }} | 
+                                    Specials: {{ userRecord.SpecialInfectedKills || 0 }} |
+                                    FF: {{ userRecord.SurvivorFFCount || 0 }} |
                                     Zombies: {{ userRecord.ZombieKills || 0 }}
                                 </small>
                             </div>
@@ -233,7 +233,7 @@
                     </div>
                 </div>
                 <em>Campaign ID</em><br>
-                <em><router-link :to="campaignURL"> {{session.campaignID}}</router-link></em>
+                <em>{{session.campaignID}}</em>
             </div>
         </div>
         <nav class="level">
@@ -399,10 +399,7 @@ export default {
             ], '#62a4b4');
         },
 
-        campaignURL() {
-            return this.session && this.session.campaignID ?
-                `/campaigns/${this.session.campaignID.substring(0,8)}` : '#'
-        },
+
         topWeaponName() {
           if(!this.session.top_weapon) return null
           let weapon = GameInfo.weapons[this.session.top_weapon.slice(7)]
