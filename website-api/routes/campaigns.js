@@ -450,9 +450,9 @@ export default function(pool) {
                     smu.survivor_deaths as deaths,
                     smu.clowns_honked as total_honks,
                     -- Calculate special infected kills
-                    (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) +
+                    CAST((COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) +
                      COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) +
-                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as specials_killed,
+                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) AS UNSIGNED) as specials_killed,
                     -- Format session times
                     FROM_UNIXTIME(smu.session_start) as session_start_formatted,
                     FROM_UNIXTIME(smu.session_end) as session_end_formatted,
@@ -493,19 +493,19 @@ export default function(pool) {
             let validDurationCount = 0;
 
             playerStats.forEach(player => {
-                aggregatedStats.total_zombies_killed += player.common_kills || 0;
-                aggregatedStats.total_specials_killed += player.specials_killed || 0;
-                aggregatedStats.total_melee_kills += player.melee_kills || 0;
-                aggregatedStats.total_damage_taken += player.damage_taken || 0;
-                aggregatedStats.total_friendly_fire_count += player.friendly_fire_count || 0;
-                aggregatedStats.total_friendly_fire_damage += player.friendly_fire_damage || 0;
-                aggregatedStats.total_molotovs_used += player.molotovs_used || 0;
-                aggregatedStats.total_pipebombs_used += player.pipebombs_used || 0;
-                aggregatedStats.total_biles_used += player.biles_used || 0;
-                aggregatedStats.total_kits_used += player.kits_used || 0;
-                aggregatedStats.total_incaps += player.incaps || 0;
-                aggregatedStats.total_deaths += player.deaths || 0;
-                aggregatedStats.total_honks += player.total_honks || 0;
+                aggregatedStats.total_zombies_killed += parseInt(player.common_kills) || 0;
+                aggregatedStats.total_specials_killed += parseInt(player.specials_killed) || 0;
+                aggregatedStats.total_melee_kills += parseInt(player.melee_kills) || 0;
+                aggregatedStats.total_damage_taken += parseInt(player.damage_taken) || 0;
+                aggregatedStats.total_friendly_fire_count += parseInt(player.friendly_fire_count) || 0;
+                aggregatedStats.total_friendly_fire_damage += parseInt(player.friendly_fire_damage) || 0;
+                aggregatedStats.total_molotovs_used += parseInt(player.molotovs_used) || 0;
+                aggregatedStats.total_pipebombs_used += parseInt(player.pipebombs_used) || 0;
+                aggregatedStats.total_biles_used += parseInt(player.biles_used) || 0;
+                aggregatedStats.total_kits_used += parseInt(player.kits_used) || 0;
+                aggregatedStats.total_incaps += parseInt(player.incaps) || 0;
+                aggregatedStats.total_deaths += parseInt(player.deaths) || 0;
+                aggregatedStats.total_honks += parseInt(player.total_honks) || 0;
 
                 // Skip ping calculation since it's not available in stats_map_users
                 // if (player.ping && player.ping > 0) {
