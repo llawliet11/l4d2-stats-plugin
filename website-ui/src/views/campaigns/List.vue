@@ -75,9 +75,10 @@
                     <tbody>
                         <tr v-for="campaign in filtered.list" :key="campaign.campaignID">
                             <td>
-                                <router-link :to="'/campaigns/map/' + campaign.map" class="has-text-link">
+                                <router-link v-if="campaign.map" :to="'/campaigns/map/' + campaign.map" class="has-text-link">
                                     <strong>{{campaign.map_name ?? campaign.map}}</strong>
                                 </router-link>
+                                <strong v-else>{{campaign.map_name ?? 'Unknown Map'}}</strong>
                             </td>
                             <td>
                                 <span class="tag is-info is-small">{{getGamemode(campaign.gamemode)}}</span>
@@ -113,7 +114,10 @@
                                     <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" size="is-small">
                                         Game
                                     </b-button>
-                                    <b-button type="is-primary" tag="router-link" :to="'/campaigns/map/' + campaign.map" size="is-small">
+                                    <b-button v-if="campaign.map" type="is-primary" tag="router-link" :to="'/campaigns/map/' + campaign.map" size="is-small">
+                                        Map
+                                    </b-button>
+                                    <b-button v-else type="is-primary" size="is-small" disabled>
                                         Map
                                     </b-button>
                                 </div>
@@ -133,9 +137,10 @@
                     <div class="box" style="height: 100%;">
                         <div class="content">
                             <h5 class="title is-5 mb-3">
-                                <router-link :to="'/campaigns/map/' + campaign.map" class="has-text-dark">
+                                <router-link v-if="campaign.map" :to="'/campaigns/map/' + campaign.map" class="has-text-dark">
                                     {{campaign.map_name || campaign.map}}
                                 </router-link>
+                                <span v-else class="has-text-dark">{{campaign.map_name || 'Unknown Map'}}</span>
                             </h5>
                             <div class="tags mb-4">
                                 <span class="tag is-info">{{getGamemode(campaign.gamemode)}}</span>
@@ -175,7 +180,10 @@
                                 <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded size="is-small">
                                     Game Details
                                 </b-button>
-                                <b-button type="is-primary" tag="router-link" :to="'/campaigns/map/' + campaign.map" expanded size="is-small">
+                                <b-button v-if="campaign.map" type="is-primary" tag="router-link" :to="'/campaigns/map/' + campaign.map" expanded size="is-small">
+                                    Map Stats
+                                </b-button>
+                                <b-button v-else type="is-primary" expanded size="is-small" disabled>
                                     Map Stats
                                 </b-button>
                             </div>

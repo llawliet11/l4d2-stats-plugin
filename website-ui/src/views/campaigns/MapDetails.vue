@@ -1,5 +1,5 @@
 <template>
-<div>
+<div class="has-text-white" style="background-color: #4c516d">
     <section class="hero is-dark">
         <div class="hero-body">
             <div class="container">
@@ -16,7 +16,7 @@
                             <a v-if="$SHARE_URL" style="color: white" @click="getShareLink()"><b-icon icon="share" /></a>
                         </h1>
                         <p class="subtitle is-4">
-                            {{mapData.aggregated_stats.total_players}} players • 
+                            {{mapData.aggregated_stats.total_players}} players •
                             {{mapData.map.chapter_count ? mapData.map.chapter_count + ' chapters' : 'Custom map'}}
                         </p>
                         <hr>
@@ -39,221 +39,171 @@
 
     <b-loading :is-full-page="false" :active="loading" />
 
-    <!-- Aggregated Statistics Section -->
-    <section v-if="mapData && !loading" class="section">
-        <div class="container">
-            <h2 class="title is-4 has-text-centered mb-6">Overall Map Statistics</h2>
-            
-            <!-- Combat Stats -->
-            <div class="box">
-                <h3 class="title is-5 mb-4">Combat Statistics</h3>
+    <!-- Individual Player Performance Section -->
+    <div v-if="mapData && !loading" class="container is-fluid">
+        <br>
+        <h2 class="title is-4 has-text-centered has-text-white mb-6">Individual Player Performance</h2>
+        <div class="columns is-multiline">
+            <div v-for="(player, index) in mapData.player_stats" class="column is-3" :key="player.steamid">
+                <div :class="[{'bg-mvp': index === 0}, 'box', 'has-text-centered']" style="position: relative">
+                    <router-link :to="'/user/' + player.steamid">
+                        <img class="is-inline-block is-pulled-left image is-128x128" :src="'/img/portraits/' + getCharacterName(index) + '.png'" />
+                    </router-link>
+                    <h6 class="title is-6">
+                        <router-link :to="'/user/' + player.steamid" class="has-text-info">
+                            {{player.last_alias ? player.last_alias.substring(0,20) : 'Unknown'}}
+                        </router-link>
+                    </h6>
+                    <p class="subtitle is-6">{{formatSessionDate(player.session_start_formatted)}}</p>
+                    <hr class="player-divider">
+                    <ul class="has-text-right">
+                        <li><span class="has-text-info">{{formatNumber(player.common_kills || 0)}}</span> commons killed</li>
+                        <li><span class="has-text-info">{{formatNumber(player.specials_killed || 0)}}</span> specials killed</li>
+                        <li><span class="has-text-info">{{formatNumber(player.friendly_fire_count || 0)}}</span> friendly fire count</li>
+                        <li><span class="has-text-info">{{formatNumber(player.friendly_fire_damage || 0)}}</span> friendly fire damage</li>
+                        <li><span class="has-text-info">{{formatNumber(player.damage_taken || 0)}}</span> damage taken</li>
+                        <li><span class="has-text-info">{{formatNumber(player.melee_kills || 0)}}</span> melee kills</li>
+                        <li><span class="has-text-info">{{formatNumber(player.incaps || 0)}}</span> incaps</li>
+                        <li><span class="has-text-info">{{formatNumber(player.deaths || 0)}}</span> deaths</li>
+                        <li v-if="player.total_honks > 0"><span class="has-text-info">{{formatNumber(player.total_honks)}}</span> clown honks</li>
+                    </ul>
+                    <br>
+                    <b-button type="is-info" tag="router-link" :to="'/user/' + player.steamid" expanded>View Profile</b-button>
+                    <div v-if="index === 0" class="ribbon ribbon-top-left"><span>Top Performer</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- Overall Map Statistics Section -->
+    <div v-if="mapData && !loading" class="container is-fluid">
+        <div class="columns">
+            <div class="column">
                 <nav class="level">
                     <div class="level-item has-text-centered">
                         <div>
                             <p class="heading">Zombies Killed</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_zombies_killed)}}</p>
+                            <p class="title has-text-white">{{formatNumber(mapData.aggregated_stats.total_zombies_killed)}}</p>
                         </div>
                     </div>
                     <div class="level-item has-text-centered">
                         <div>
                             <p class="heading">Specials Killed</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_specials_killed)}}</p>
+                            <p class="title has-text-white">{{formatNumber(mapData.aggregated_stats.total_specials_killed)}}</p>
+                        </div>
+                    </div>
+                    <div class="level-item has-text-centered">
+                        <div>
+                            <p class="heading">Damage Taken</p>
+                            <p class="title has-text-white">{{formatNumber(mapData.aggregated_stats.total_damage_taken)}}</p>
                         </div>
                     </div>
                     <div class="level-item has-text-centered">
                         <div>
                             <p class="heading">Melee Kills</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_melee_kills)}}</p>
-                        </div>
-                    </div>
-                </nav>
-            </div>
-
-            <!-- Damage Stats -->
-            <div class="box">
-                <h3 class="title is-5 mb-4">Damage Statistics</h3>
-                <nav class="level">
-                    <div class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">Damage Taken</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_damage_taken)}}</p>
+                            <p class="title has-text-white">{{formatNumber(mapData.aggregated_stats.total_melee_kills)}}</p>
                         </div>
                     </div>
                     <div class="level-item has-text-centered">
                         <div>
                             <p class="heading">Friendly Fire Count</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_friendly_fire_count)}}</p>
+                            <p class="title has-text-white">{{formatNumber(mapData.aggregated_stats.total_friendly_fire_count)}}</p>
                         </div>
                     </div>
                     <div class="level-item has-text-centered">
                         <div>
-                            <p class="heading">FF Damage Dealt</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_friendly_fire_damage)}}</p>
+                            <p class="heading">Friendly Fire Damage Dealt</p>
+                            <p class="title has-text-white">{{formatNumber(mapData.aggregated_stats.total_friendly_fire_damage)}}</p>
                         </div>
                     </div>
                 </nav>
-            </div>
 
-            <!-- Items Used -->
-            <div class="box">
-                <h3 class="title is-5 mb-4">Items Used</h3>
-                <nav class="level">
-                    <div class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">Molotovs</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_molotovs_used)}}</p>
-                        </div>
-                    </div>
-                    <div class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">Pipebombs</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_pipebombs_used)}}</p>
-                        </div>
-                    </div>
-                    <div class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">Biles</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_biles_used)}}</p>
-                        </div>
-                    </div>
-                    <div class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">Kits Used</p>
-                            <p class="title">{{formatNumber(mapData.aggregated_stats.total_kits_used)}}</p>
-                        </div>
-                    </div>
-                </nav>
-            </div>
-
-            <!-- Player Status & Misc -->
-            <div class="columns">
-                <div class="column">
-                    <div class="box">
-                        <h3 class="title is-5 mb-4">Player Status</h3>
-                        <nav class="level">
-                            <div class="level-item has-text-centered">
-                                <div>
-                                    <p class="heading">Incaps</p>
-                                    <p class="title">{{formatNumber(mapData.aggregated_stats.total_incaps)}}</p>
-                                </div>
+                <div class="tile is-ancestor">
+                    <div class="tile is-vertical">
+                        <div class="tile">
+                            <div class="tile is-parent is-vertical">
+                                <article class="tile is-child notification is-info">
+                                    <p>&nbsp;</p>
+                                    <nav class="level">
+                                        <div class="level-item has-text-centered">
+                                            <div>
+                                                <p class="heading">Molotovs</p>
+                                                <p class="title">{{formatNumber(mapData.aggregated_stats.total_molotovs_used)}}</p>
+                                            </div>
+                                        </div>
+                                        <div class="level-item has-text-centered">
+                                            <div>
+                                                <p class="heading">Pipebombs</p>
+                                                <p class="title">{{formatNumber(mapData.aggregated_stats.total_pipebombs_used)}}</p>
+                                            </div>
+                                        </div>
+                                        <div class="level-item has-text-centered">
+                                            <div>
+                                                <p class="heading">Biles</p>
+                                                <p class="title">{{formatNumber(mapData.aggregated_stats.total_biles_used)}}</p>
+                                            </div>
+                                        </div>
+                                    </nav>
+                                </article>
                             </div>
-                            <div class="level-item has-text-centered">
-                                <div>
-                                    <p class="heading">Deaths</p>
-                                    <p class="title">{{formatNumber(mapData.aggregated_stats.total_deaths)}}</p>
-                                </div>
+                            <div class="tile is-parent is-vertical">
+                                <article class="tile is-child notification has-text-white" style="background-color: #d6405e">
+                                    <p>&nbsp;</p>
+                                    <nav class="level">
+                                        <div class="level-item has-text-centered">
+                                            <div>
+                                                <p class="heading">Incaps</p>
+                                                <p class="title">{{formatNumber(mapData.aggregated_stats.total_incaps)}}</p>
+                                            </div>
+                                        </div>
+                                        <div class="level-item has-text-centered">
+                                            <div>
+                                                <p class="heading">Deaths</p>
+                                                <p class="title">{{formatNumber(mapData.aggregated_stats.total_deaths)}}</p>
+                                            </div>
+                                        </div>
+                                        <div class="level-item has-text-centered">
+                                            <div>
+                                                <p class="heading">Kits Used</p>
+                                                <p class="title">{{formatNumber(mapData.aggregated_stats.total_kits_used)}}</p>
+                                            </div>
+                                        </div>
+                                    </nav>
+                                </article>
                             </div>
-                        </nav>
+                        </div>
                     </div>
                 </div>
-                <div class="column">
-                    <div class="box">
-                        <h3 class="title is-5 mb-4">Session Info</h3>
-                        <nav class="level">
-                            <div class="level-item has-text-centered">
-                                <div>
-                                    <p class="heading">Average Ping</p>
-                                    <p class="title">{{mapData.aggregated_stats.avg_ping}} ms</p>
-                                </div>
-                            </div>
-                            <div class="level-item has-text-centered">
-                                <div>
-                                    <p class="heading">Total Honks</p>
-                                    <p class="title">{{formatNumber(mapData.aggregated_stats.total_honks)}}</p>
-                                </div>
-                            </div>
-                        </nav>
+            </div>
+            <div class="column is-3">
+                <div class="box">
+                    <div class="has-text-left">
+                        <strong>Map</strong>
+                        <p>{{mapData.map.name || mapData.map.mapid}} <em class="is-pulled-right">({{mapData.map.mapid}})</em></p>
+                        <strong>Total Players</strong>
+                        <p>{{mapData.aggregated_stats.total_players}} unique players</p>
+                        <strong>Map Type</strong>
+                        <p>{{mapData.map.chapter_count ? mapData.map.chapter_count + ' chapters' : 'Custom map'}}</p>
+                        <span v-if="mapData.aggregated_stats.avg_ping > 0">
+                            <strong>Average Ping</strong>
+                            <p>{{mapData.aggregated_stats.avg_ping}} ms</p>
+                        </span>
+                        <span v-if="mapData.aggregated_stats.total_honks > 0">
+                            <strong>Total Honks</strong>
+                            <p>{{formatNumber(mapData.aggregated_stats.total_honks)}}</p>
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
 
-    <!-- Player Statistics Table -->
-    <section v-if="mapData && !loading" class="section">
-        <div class="container">
-            <h2 class="title is-4 has-text-centered mb-6">Individual Player Performance</h2>
-            <div class="box">
-                <b-table 
-                    :data="mapData.player_stats" 
-                    :loading="loading"
-                    :paginated="true"
-                    :per-page="10"
-                    :pagination-simple="false"
-                    :default-sort="['session_start', 'desc']"
-                    detailed
-                    detail-key="steamid"
-                    show-detail-icon>
-                    
-                    <b-table-column field="last_alias" label="Player" sortable v-slot="props">
-                        <router-link :to="'/user/' + props.row.steamid" class="has-text-link">
-                            {{props.row.last_alias}}
-                        </router-link>
-                    </b-table-column>
-
-                    <b-table-column field="session_start_formatted" label="Date Played" sortable v-slot="props">
-                        {{formatSessionDate(props.row.session_start_formatted)}}
-                    </b-table-column>
-
-                    <b-table-column field="common_kills" label="Zombies" numeric sortable v-slot="props">
-                        {{formatNumber(props.row.common_kills || 0)}}
-                    </b-table-column>
-
-                    <b-table-column field="specials_killed" label="Specials" numeric sortable v-slot="props">
-                        {{formatNumber(props.row.specials_killed || 0)}}
-                    </b-table-column>
-
-                    <b-table-column field="damage_taken" label="Damage Taken" numeric sortable v-slot="props">
-                        {{formatNumber(props.row.damage_taken || 0)}}
-                    </b-table-column>
-
-                    <b-table-column field="incaps" label="Incaps" numeric sortable v-slot="props">
-                        {{formatNumber(props.row.incaps || 0)}}
-                    </b-table-column>
-
-                    <b-table-column field="deaths" label="Deaths" numeric sortable v-slot="props">
-                        {{formatNumber(props.row.deaths || 0)}}
-                    </b-table-column>
-
-                    <b-table-column field="ping" label="Ping" numeric sortable v-slot="props">
-                        {{props.row.ping ? props.row.ping + ' ms' : 'N/A'}}
-                    </b-table-column>
-
-                    <template #detail="props">
-                        <div class="content">
-                            <div class="columns">
-                                <div class="column">
-                                    <strong>Combat Details:</strong>
-                                    <ul>
-                                        <li>Melee Kills: {{formatNumber(props.row.melee_kills || 0)}}</li>
-                                        <li>Friendly Fire Count: {{formatNumber(props.row.friendly_fire_count || 0)}}</li>
-                                        <li>FF Damage Dealt: {{formatNumber(props.row.friendly_fire_damage || 0)}}</li>
-                                    </ul>
-                                </div>
-                                <div class="column">
-                                    <strong>Items Used:</strong>
-                                    <ul>
-                                        <li>Molotovs: {{formatNumber(props.row.molotovs_used || 0)}}</li>
-                                        <li>Pipebombs: {{formatNumber(props.row.pipebombs_used || 0)}}</li>
-                                        <li>Biles: {{formatNumber(props.row.biles_used || 0)}}</li>
-                                        <li>Kits: {{formatNumber(props.row.kits_used || 0)}}</li>
-                                    </ul>
-                                </div>
-                                <div class="column">
-                                    <strong>Session Info:</strong>
-                                    <ul>
-                                        <li>Duration: {{props.row.session_duration_minutes ? props.row.session_duration_minutes + ' min' : 'N/A'}}</li>
-                                        <li>Total Honks: {{formatNumber(props.row.total_honks || 0)}}</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </b-table>
-            </div>
-        </div>
-    </section>
+    <br>
 </div>
+
+
 </template>
 
 <script>
@@ -277,10 +227,10 @@ export default {
         fetchMapCampaignDetails() {
             this.loading = true
             this.error = null
-            
+
             const mapId = this.$route.params.mapId
             document.title = `Map Campaign Details - ${mapId} - L4D2 Stats Plugin`
-            
+
             this.$http.get(`/api/campaigns/map/${mapId}`)
             .then(response => {
                 this.mapData = response.data
@@ -311,7 +261,7 @@ export default {
             const date = new Date(dateString)
             return date.toLocaleDateString('en-US', {
                 month: '2-digit',
-                day: '2-digit', 
+                day: '2-digit',
                 year: 'numeric'
             }) + ' at ' + date.toLocaleTimeString('en-US', {
                 hour: 'numeric',
@@ -330,6 +280,11 @@ export default {
                     })
                 })
             }
+        },
+        getCharacterName(index) {
+            // Assign characters based on player index for consistency
+            const characters = ['gambler', 'producer', 'mechanic', 'coach', 'namvet', 'teenangst', 'biker', 'manager']
+            return characters[index % characters.length]
         }
     }
 }
@@ -362,5 +317,70 @@ export default {
 
 .has-text-link:hover {
     color: #2366d1 !important;
+}
+
+.player-divider {
+    margin: 0.5rem 0;
+}
+
+.bg-mvp {
+    background-color: rgb(132, 218, 230) !important;
+}
+
+.ribbon {
+    width: 150px;
+    height: 150px;
+    overflow: hidden;
+    position: absolute;
+}
+
+.ribbon::before,
+.ribbon::after {
+    position: absolute;
+    z-index: -1;
+    content: '';
+    display: block;
+    border: 5px solid #2980b9;
+}
+
+.ribbon span {
+    position: absolute;
+    display: block;
+    width: 225px;
+    padding: 15px 0;
+    background-color: #3498db;
+    box-shadow: 0 5px 10px rgba(0,0,0,.1);
+    color: #fff;
+    font: 700 18px/1 'Lato', sans-serif;
+    text-shadow: 0 1px 1px rgba(0,0,0,.2);
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.ribbon-top-left {
+    top: -10px;
+    left: -10px;
+}
+
+.ribbon-top-left::before,
+.ribbon-top-left::after {
+    border-top-color: transparent;
+    border-left-color: transparent;
+}
+
+.ribbon-top-left::before {
+    top: 0;
+    right: 0;
+}
+
+.ribbon-top-left::after {
+    bottom: 0;
+    left: 0;
+}
+
+.ribbon-top-left span {
+    right: -25px;
+    top: 30px;
+    transform: rotate(-45deg);
 }
 </style>

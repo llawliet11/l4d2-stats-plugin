@@ -10,7 +10,7 @@ Canvas.registerFont('./assets/fonts/OpenSans-Light.ttf', { family: 'OpenSans', w
 Canvas.registerFont('./assets/fonts/micross.ttf', { family: 'MS-Sans-Serif' })
 Canvas.registerFont('./assets/fonts/Roboto-Bold.ttf', { family: 'Roboto', weight: 'Bold'})
 
-import GameData from '../assets/gameinfo.json' assert { type: "json" };
+import GameData from '../assets/gameinfo.json' with { type: "json" };
 const SurvivorNames = GameData.survivors
 const WeaponNames = GameData.weapons
 const DifficultyNames = GameData.difficulties
