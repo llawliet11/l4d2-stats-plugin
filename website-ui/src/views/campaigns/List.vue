@@ -75,7 +75,9 @@
                     <tbody>
                         <tr v-for="campaign in filtered.list" :key="campaign.campaignID">
                             <td>
-                                <strong>{{campaign.map_name ?? campaign.map}}</strong>
+                                <router-link :to="'/campaigns/map/' + campaign.map" class="has-text-link">
+                                    <strong>{{campaign.map_name ?? campaign.map}}</strong>
+                                </router-link>
                             </td>
                             <td>
                                 <span class="tag is-info is-small">{{getGamemode(campaign.gamemode)}}</span>
@@ -107,9 +109,14 @@
                                 <span v-else class="has-text-grey">-</span>
                             </td>
                             <td>
-                                <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" size="is-small">
-                                    View Details
-                                </b-button>
+                                <div class="buttons are-small">
+                                    <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" size="is-small">
+                                        Game
+                                    </b-button>
+                                    <b-button type="is-primary" tag="router-link" :to="'/campaigns/map/' + campaign.map" size="is-small">
+                                        Map
+                                    </b-button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -125,7 +132,11 @@
                 <div v-for="campaign in recentCampaigns" class="column is-6-tablet is-4-desktop" :key="campaign.campaignID">
                     <div class="box" style="height: 100%;">
                         <div class="content">
-                            <h5 class="title is-5 mb-3">{{campaign.map_name || campaign.map}}</h5>
+                            <h5 class="title is-5 mb-3">
+                                <router-link :to="'/campaigns/map/' + campaign.map" class="has-text-dark">
+                                    {{campaign.map_name || campaign.map}}
+                                </router-link>
+                            </h5>
                             <div class="tags mb-4">
                                 <span class="tag is-info">{{getGamemode(campaign.gamemode)}}</span>
                                 <span class="tag is-warning">{{formatDifficulty(campaign.difficulty)}}</span>
@@ -160,9 +171,14 @@
                                 </b-taglist>
                             </div>
 
-                            <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded size="is-small">
-                                View Details
-                            </b-button>
+                            <div class="buttons">
+                                <b-button type="is-info" tag="router-link" :to="'/campaigns/' + campaign.campaignID" expanded size="is-small">
+                                    Game Details
+                                </b-button>
+                                <b-button type="is-primary" tag="router-link" :to="'/campaigns/map/' + campaign.map" expanded size="is-small">
+                                    Map Stats
+                                </b-button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -364,5 +380,20 @@ export default {
 }
 .table td {
     vertical-align: middle;;
+}
+.has-text-dark {
+    color: #363636 !important;
+}
+.has-text-dark:hover {
+    color: #3273dc !important;
+}
+.has-text-link {
+    color: #3273dc !important;
+}
+.has-text-link:hover {
+    color: #2366d1 !important;
+}
+.buttons.are-small .button {
+    margin-bottom: 0;
 }
 </style>

@@ -401,5 +401,142 @@ export default function(pool) {
         }
     })
     
+    // New endpoint: Get campaign details for a specific map
+    router.get('/map/:mapId', routeCache.cacheSeconds(120), async(req, res) => {
+        try {
+            const mapId = req.params.mapId;
+
+            // Validate mapId parameter
+            if (!mapId || mapId.trim() === '') {
+                return res.status(400).json({
+                    error: "INVALID_MAP_ID",
+                    message: "Map ID is required"
+                });
+            }
+
+            // Get map information
+            const [mapInfo] = await pool.query(`
+                SELECT mapid, name, chapter_count, flags
+                FROM map_info
+                WHERE mapid = ?
+            `, [mapId]);
+
+            if (mapInfo.length === 0) {
+                return res.status(404).json({
+                    error: "MAP_NOT_FOUND",
+                    message: "Map not found"
+                });
+            }
+
+            // Get all player statistics for this map
+            const [playerStats] = await pool.query(`
+                SELECT
+                    smu.steamid,
+                    smu.last_alias,
+                    smu.mapid,
+                    smu.session_start,
+                    smu.session_end,
+                    smu.ping,
+                    smu.common_kills,
+                    smu.melee_kills,
+                    smu.survivor_damage_rec as damage_taken,
+                    smu.survivor_ff as friendly_fire_count,
+                    smu.survivor_ff_damage as friendly_fire_damage,
+                    smu.pickups_molotov as molotovs_used,
+                    smu.pickups_pipe_bomb as pipebombs_used,
+                    smu.boomer_mellos as biles_used,
+                    (smu.heal_others + smu.heal_self) as kits_used,
+                    smu.survivor_incaps as incaps,
+                    smu.survivor_deaths as deaths,
+                    smu.clowns_honked as total_honks,
+                    -- Calculate special infected kills
+                    (COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) +
+                     COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) +
+                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as specials_killed,
+                    -- Format session times
+                    FROM_UNIXTIME(smu.session_start) as session_start_formatted,
+                    FROM_UNIXTIME(smu.session_end) as session_end_formatted,
+                    -- Calculate session duration in minutes
+                    CASE
+                        WHEN smu.session_end > smu.session_start
+                        THEN ROUND((smu.session_end - smu.session_start) / 60, 1)
+                        ELSE NULL
+                    END as session_duration_minutes
+                FROM stats_map_users smu
+                WHERE smu.mapid = ?
+                ORDER BY smu.session_start DESC
+            `, [mapId]);
+
+            // Calculate aggregated statistics
+            const aggregatedStats = {
+                total_players: playerStats.length,
+                total_zombies_killed: 0,
+                total_specials_killed: 0,
+                total_melee_kills: 0,
+                total_damage_taken: 0,
+                total_friendly_fire_count: 0,
+                total_friendly_fire_damage: 0,
+                total_molotovs_used: 0,
+                total_pipebombs_used: 0,
+                total_biles_used: 0,
+                total_kits_used: 0,
+                total_incaps: 0,
+                total_deaths: 0,
+                total_honks: 0,
+                avg_ping: 0,
+                avg_session_duration: 0
+            };
+
+            let totalPing = 0;
+            let totalDuration = 0;
+            let validPingCount = 0;
+            let validDurationCount = 0;
+
+            playerStats.forEach(player => {
+                aggregatedStats.total_zombies_killed += player.common_kills || 0;
+                aggregatedStats.total_specials_killed += player.specials_killed || 0;
+                aggregatedStats.total_melee_kills += player.melee_kills || 0;
+                aggregatedStats.total_damage_taken += player.damage_taken || 0;
+                aggregatedStats.total_friendly_fire_count += player.friendly_fire_count || 0;
+                aggregatedStats.total_friendly_fire_damage += player.friendly_fire_damage || 0;
+                aggregatedStats.total_molotovs_used += player.molotovs_used || 0;
+                aggregatedStats.total_pipebombs_used += player.pipebombs_used || 0;
+                aggregatedStats.total_biles_used += player.biles_used || 0;
+                aggregatedStats.total_kits_used += player.kits_used || 0;
+                aggregatedStats.total_incaps += player.incaps || 0;
+                aggregatedStats.total_deaths += player.deaths || 0;
+                aggregatedStats.total_honks += player.total_honks || 0;
+
+                if (player.ping && player.ping > 0) {
+                    totalPing += player.ping;
+                    validPingCount++;
+                }
+
+                if (player.session_duration_minutes && player.session_duration_minutes > 0) {
+                    totalDuration += player.session_duration_minutes;
+                    validDurationCount++;
+                }
+            });
+
+            // Calculate averages
+            aggregatedStats.avg_ping = validPingCount > 0 ? Math.round(totalPing / validPingCount) : 0;
+            aggregatedStats.avg_session_duration = validDurationCount > 0 ?
+                Math.round((totalDuration / validDurationCount) * 10) / 10 : 0;
+
+            res.json({
+                map: mapInfo[0],
+                aggregated_stats: aggregatedStats,
+                player_stats: playerStats
+            });
+
+        } catch(err) {
+            console.error('[/api/campaigns/map/:mapId]', err.stack);
+            res.status(500).json({
+                error: "INTERNAL_SERVER_ERROR",
+                message: "Failed to fetch map campaign details"
+            });
+        }
+    });
+
     return router;
 }
