@@ -37,7 +37,7 @@ export default function(pool) {
             pointCalculator.reloadConfig();
 
             // Clear route cache to ensure fresh data
-            routeCache.removeCache('/point-system');
+            routeCache.removeCache('/api/point-system');
 
             res.json({
                 success: true,
