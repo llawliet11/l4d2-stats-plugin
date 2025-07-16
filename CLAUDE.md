@@ -4,11 +4,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a comprehensive Left 4 Dead 2 statistics tracking system consisting of:
+This is a comprehensive Left 4 Dead 2 statistics tracking system featuring a **sophisticated four-tier point calculation architecture** with dual penalty systems and comprehensive player performance analytics:
+
 - **SourceMod Plugins**: Two .sp files that run on the L4D2 server to track gameplay statistics
 - **Website API**: Node.js Express server that provides REST endpoints for statistics data
 - **Website UI**: Vue.js frontend for displaying player statistics and game data
-- **Database**: MariaDB/MySQL database for storing all game statistics
+- **Database**: MariaDB/MySQL database with map-based statistics architecture
+- **Point System**: Four-tier calculation system (overall, map, MVP all-time, MVP per map)
+- **Configuration**: Fully configurable rules via point-system.json
+
+## System Architecture Summary
+
+### Four-Tier Point Calculation System
+1. **Overall Points**: Lifetime cumulative statistics across all maps (harsh FF penalties)
+2. **Map Points**: Map-specific statistics with same penalty system as overall
+3. **MVP All Time**: Global champion recognition (lighter FF penalties)
+4. **MVP per Map**: Map-specific champion recognition (lighter FF penalties)
+
+### Dual Penalty Philosophy
+- **Rankings System**: Harsh FF penalties (-40 per damage) for competitive integrity
+- **MVP System**: Lighter FF penalties (-3 multiplier) for skill recognition
+- **Configurable**: All penalty values adjustable in point-system.json
+
+### Map-Based Database Architecture
+- **stats_users**: Lifetime cumulative statistics
+- **stats_map_users**: Map-specific performance tracking
+- **stats_games**: Individual session records
+- **Referential Integrity**: Foreign key relationships ensure data consistency
 
 ## Architecture
 
@@ -201,15 +223,47 @@ Copy `.env.example` to `.env` and configure:
 ## Statistics Tracking
 
 The system tracks comprehensive L4D2 gameplay statistics including:
-- Player performance metrics
-- Weapon usage statistics
-- Map completion data
-- Skill-based actions (skeets, crowns, etc.)
-- Session-based gameplay tracking
+- Player performance metrics with enhanced activity detection
+- Weapon usage statistics and skill-based actions (skeets, crowns, etc.)
+- Map completion data with session-based tracking
 - Geographic player data via GeoIP
-- Campaign progress and scoring
+- Campaign progress and scoring with dual penalty systems
+- Real-time point calculation with configurable rules
 
-## MVP Calculation System
+### Enhanced Activity Detection
+- **Comprehensive Tracking**: Multiple activity indicators prevent data loss
+- **Multi-Factor Detection**: Time-based, action-based, and interaction-based criteria
+- **Edge Case Handling**: Graceful accommodation of various play styles
+- **Quality Assurance**: Regular validation ensures detection accuracy
+
+## Four-Tier Point Calculation System
+
+### Architecture Overview
+The system implements four distinct point calculation tiers, each serving different purposes:
+
+#### 1. Overall Points (Global Rankings)
+- **Data Source**: `stats_users` table (lifetime cumulative stats)
+- **Penalty System**: Harsh FF penalties (-40 per damage) for competitive integrity
+- **Purpose**: Global leaderboards and long-term player rankings
+- **Configuration**: `point-system.json` → `penalties.friendly_fire_damage`
+
+#### 2. Map Points (Map-Specific Rankings)
+- **Data Source**: `stats_map_users` table (map-specific stats)
+- **Penalty System**: Same harsh FF penalties as overall (-40 per damage)
+- **Purpose**: Map-specific leaderboards and comparative analysis
+- **Configuration**: `point-system.json` → `penalties.friendly_fire_damage`
+
+#### 3. MVP All Time (Global Champion)
+- **Data Source**: `stats_users` table (lifetime stats)
+- **Penalty System**: Lighter FF penalties (-3 multiplier) for skill recognition
+- **Purpose**: Overall champion recognition focusing on positive contributions
+- **Configuration**: `point-system.json` → `mvp_calculation.point_values.penalties`
+
+#### 4. MVP per Map (Map Champion)
+- **Data Source**: `stats_map_users` table (map-specific stats)
+- **Penalty System**: Lighter FF penalties (-3 multiplier) for skill recognition
+- **Purpose**: Map-specific champion recognition
+- **Configuration**: `point-system.json` → `mvp_calculation.point_values.penalties`
 
 ### MVPCalculator Service
 The `MVPCalculator.js` service provides centralized MVP calculation logic:
@@ -221,9 +275,9 @@ The `MVPCalculator.js` service provides centralized MVP calculation logic:
 - Damage taken bonus system (rewards taking less damage than average)
 - Fallback ranking criteria for tie-breaking
 
-**Point System:**
+**Point System (MVP Calculations):**
 - **Positive Actions**: Common kills (+1), Special kills (+6), Tank kills (+100), Witch kills (+15), Healing (+40), Reviving (+25), Defibs (+30), Finale wins (+1000)
-- **Penalties**: Teammate kills (-100), Friendly fire damage (-2 per HP)
+- **Penalties**: Teammate kills (-100), Friendly fire damage (-3 multiplier)
 - **Bonuses**: Damage taken bonus (+(avg_damage - player_damage) × 0.5)
 
 **Usage:**
@@ -237,11 +291,22 @@ const mvpPoints = MVPCalculator.calculateMVPPoints(playerData, avgDamageTaken)
 const playersWithMVP = MVPCalculator.calculateAndMarkMVP(players)
 ```
 
-### Configuration
-- Point values and rules are stored in `/website-api/config/point-system.json`
-- System supports comprehensive configuration with enabled/disabled features
-- Fallback defaults are provided if configuration file is missing
-- Configuration includes validation rules and reasonable value limits
+### Configuration Management
+- **File**: `/website-api/config/point-system.json`
+- **Principle**: ALL calculations MUST strictly follow configuration (no hardcoded values)
+- **Flexibility**: Complete rule customization without code changes
+- **Reload**: Restart API and run `/api/recalculate` for configuration changes
+
+### Dual Penalty System Rationale
+**Rankings System (-40 FF penalty):**
+- Long-term competitive integrity
+- Rewards disciplined, team-first play
+- Prevents careless friendly fire
+
+**MVP System (-3 FF penalty):**
+- Focuses on positive skill recognition
+- Allows skilled players with minor FF to compete for MVP
+- Encourages exceptional performance
 
 ## Testing and Code Quality
 
@@ -301,29 +366,88 @@ curl http://localhost:8081/api/health
 # Returns user counts, playtime stats, session metrics, and system health
 ```
 
-## Recent Improvements
+## Recent Improvements & System Status
 
-### API Consistency Fixes
-- **Search Endpoint**: Fixed to use database points instead of calculated values
-- **User Endpoints**: Updated `/random` and `/:user` to use consistent database points
-- **Point System**: All endpoints now return identical point values across the application
+### Data Consistency Enhancements
+- **Unified Point System**: All endpoints return identical point values from database
+- **kills_all_specials Update**: Fixed aggregation in both `stats_users` and `stats_map_users`
+- **Negative Points Support**: Updated database schema to allow negative point values
+- **Point Recalculation**: Comprehensive `/api/recalculate` endpoint for rule changes
 
-### Enhanced Plugin Logic
-- **Activity Detection**: Improved detection to prevent data loss
-- **Additional Checks**: Added door opens and damage dealt as activity indicators
-- **Comprehensive Logging**: Better activity tracking for edge cases
+### Enhanced Activity Detection
+- **Multi-Factor Detection**: Time-based, action-based, and interaction-based criteria
+- **Data Loss Prevention**: Comprehensive checks prevent missing active player data
+- **Edge Case Handling**: Graceful accommodation of various play styles
+- **Quality Assurance**: Regular validation ensures detection accuracy
 
-### Database Health Monitoring
-- **Health Endpoint**: New `/api/health` endpoint for monitoring system status
-- **Diagnostic Tools**: `database_maintenance.sql` with comprehensive diagnostic queries
-- **Performance Metrics**: User activity, session quality, and data integrity checks
+### System Monitoring & Health
+- **Health Endpoint**: `/api/health` provides system status and metrics
+- **Diagnostic Tools**: Comprehensive database maintenance and validation scripts
+- **Performance Metrics**: User activity, session quality, and data integrity monitoring
+- **Configuration Validation**: Runtime checks ensure point-system.json integrity
+
+### Recent Fixes Applied
+- **Tank Damage Double-Counting**: Fixed by disabling tank_damage rule in favor of tank_kill_max
+- **Friendly Fire Penalties**: Verified dual penalty system implementation
+- **Point Calculation Consistency**: Eliminated discrepancies between different views
+- **MVP System Integration**: Both all-time and per-map MVP fully operational
 
 ## Development Notes
 
 - SourceMod plugin compilation is done manually, no need to compile via Claude
 - UI development uses Vue.js 2 with Buefy component library
 - API uses ES6 modules (`"type": "module"` in package.json)
+- All point calculations MUST follow point-system.json configuration
+- Never hardcode point values or penalties in calculation logic
 
 ## SSH and Git Workflow
 
 - When accessing ssh-homelab mcp for the left4dead2-stats project, always do a `git pull` first to get all updates
+
+## Comprehensive Documentation Reference
+
+For detailed technical information, refer to these documentation files:
+
+### Feature Documentation
+- **`docs/features/POINT_CALCULATION_SYSTEM.md`**: Complete four-tier point system documentation
+- **`docs/features/MVP_CALCULATION_RULES.md`**: MVP system rules and configuration
+- **`docs/features/PENALTY_SYSTEM_DESIGN.md`**: Dual penalty system design and rationale
+- **`docs/features/MAP_BASED_STATISTICS_ARCHITECTURE.md`**: Map-based database architecture
+- **`docs/features/ENHANCEMENT_IMPROVEMENTS.md`**: Recent improvements and system monitoring
+
+### Setup Documentation
+- **`docs/setup/DOCKER-SETUP.md`**: Docker environment setup guide
+- **`README.md`**: Basic setup and Docker configuration
+
+### Troubleshooting
+- **`docs/troubleshooting/`**: Issues and fixes documentation
+- **`docs/reports/`**: Testing and debugging reports
+
+## System Status Summary
+
+### ✅ Fully Operational
+- Four-tier point calculation system
+- Dual penalty system (rankings vs MVP)
+- Map-based statistics architecture
+- MVP calculations (all-time and per-map)
+- Configuration-driven design
+- Enhanced activity detection
+- System health monitoring
+
+### 🔧 Configuration-Driven
+- All point values configurable in `point-system.json`
+- No hardcoded values in calculation logic
+- Runtime configuration changes supported
+- Comprehensive validation rules
+
+### 📊 Data Integrity
+- Unified point system across all endpoints
+- Referential integrity with foreign key constraints
+- Regular consistency checks and validation
+- Comprehensive diagnostic capabilities
+
+---
+
+**Last Updated**: 2025-01-16  
+**System Version**: 4-Tier Point Calculation Architecture  
+**Status**: Production-ready with comprehensive monitoring
