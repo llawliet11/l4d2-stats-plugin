@@ -133,7 +133,7 @@ export default {
         message: 'This will recalculate all user points based on the current scoring rules. This process may take several minutes and will clear existing point history. Are you sure you want to continue?',
         confirmText: 'Recalculate',
         type: 'is-warning',
-        hasIcon: true,
+        hasIcon: false,
         onConfirm: () => this.performRecalculation()
       })
     },
