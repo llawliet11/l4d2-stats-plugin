@@ -105,6 +105,13 @@ export default {
     border: 1px solid #e0e0e0;
 }
 
+/* When table has pagination, adjust the wrapper */
+.beautiful-table .table-wrapper {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: none;
+}
+
 .table-wrapper::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -188,6 +195,23 @@ export default {
 
 .beautiful-table .pagination {
     justify-content: center !important;
+}
+
+/* Override Buefy table pagination positioning */
+.beautiful-table .b-table .table-wrapper {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.beautiful-table .b-table .pagination-wrapper {
+    background: white;
+    padding: 15px 20px;
+    border-top: 1px solid #f5f5f5;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    display: flex;
+    justify-content: center;
+    margin: 0;
 }
 
 .beautiful-table .pagination-link,
