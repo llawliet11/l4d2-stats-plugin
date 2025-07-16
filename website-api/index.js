@@ -37,9 +37,14 @@ import RouteMisc from './routes/misc.js'
     const pool = mysql.createPool(details);
     console.log('Connecting to', (details.socketPath || `${details.host}:${details.port}`), 'database', details.database)
 
+    // Middleware for parsing JSON requests
+    app.use(Express.json({ limit: '10mb' }));
+
     app.use((req, res, next) => {
         if(!req.headers.origin || whitelist.includes(req.headers.origin)) {
             res.header("Access-Control-Allow-Origin", req.headers.origin ?? "*");
+            res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
         }
         next()
     })

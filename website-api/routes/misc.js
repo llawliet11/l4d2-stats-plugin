@@ -28,6 +28,33 @@ export default function(pool) {
         }
     });
 
+
+
+    // Reload point system configuration
+    router.post('/point-system/reload', async(req, res) => {
+        try {
+            const pointCalculator = new PointCalculator();
+            pointCalculator.reloadConfig();
+
+            // Clear route cache to ensure fresh data
+            routeCache.removeCache('/point-system');
+
+            res.json({
+                success: true,
+                message: 'Point system configuration reloaded successfully',
+                version: pointCalculator.getConfig().version,
+                last_updated: pointCalculator.getConfig().last_updated
+            });
+        } catch (error) {
+            console.error('[/api/point-system/reload] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to reload point system configuration',
+                error: error.message
+            });
+        }
+    });
+
     // Point calculation breakdown for a specific session
     router.get('/point-breakdown/:sessionId', async(req, res) => {
         try {

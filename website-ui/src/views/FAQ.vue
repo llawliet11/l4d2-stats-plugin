@@ -40,24 +40,49 @@
                             <p><strong>Warning:</strong> Could not load current point rules from server. Displaying fallback values.</p>
                             <p><em>{{ rulesError }}</em></p>
                         </div>
-                        <ul v-if="!loadingRules">
-                            <li><span class="has-text-success">+{{ positiveActions.common_kill || 1 }}</span> per common killed (any damage type)</li>
-                            <li><span class="has-text-success">+{{ positiveActions.headshot || 2 }}</span> per common headshot</li>
-                            <li><span class="has-text-success">+{{ positiveActions.special_kill || 6 }}</span> per special kill</li>
-                            <li><span class="has-text-success">+{{ positiveActions.tank_kill_max || 100 }}</span> per tank kill <em>(total points distributed among all players in the session based on damage dealt)</em></li>
-                            <li><span class="has-text-success">+{{ positiveActions.tank_kill_solo || 20 }}</span> per tank kill solo <em>(bonus for killer only)</em></li>
-                            <li><span class="has-text-success">+{{ positiveActions.tank_kill_melee || 50 }}</span> per tank kill melee <em>(bonus for killer only)</em></li>
-                            <li><span class="has-text-success">+{{ positiveActions.witch_kill || 15 }}</span> per witch kill</li>
-                            <li><span class="has-text-success">+{{ positiveActions.heal_teammate || 40 }}</span> per heal teammate <em>(+{{ positiveActions.heal_teammate_critical || 60 }} if target ≤30% health)</em></li>
-                            <li><span class="has-text-success">+{{ positiveActions.revive_teammate || 25 }}</span> per revive teammate</li>
-                            <li><span class="has-text-success">+{{ positiveActions.defib_teammate || 50 }}</span> per teammate defibbed</li>
-                            <li><span class="has-text-success">+{{ positiveActions.teammate_save || 20 }}</span> per teammate save from specials</li>
-                            <li><span class="has-text-success">+{{ positiveActions.ammo_pack_deploy || 20 }}</span> per ammo pack deploy</li>
-                            <li><span class="has-text-success">+{{ positiveActions.finale_win || 1000 }}</span> per finale win</li>
+
+                        <!-- Point System Info -->
+                        <div v-if="!loadingRules" class="notification is-info is-light mb-4">
+                            <p><strong>Point System Version:</strong> {{ systemVersion }}</p>
+                            <p><strong>Last Updated:</strong> {{ lastUpdated }}</p>
+                            <p class="help">Edit the point-system.json file directly on the server, then click the button below to reload the rules.</p>
+                            <div class="buttons">
+                                <b-button
+                                    type="is-primary"
+                                    size="is-small"
+                                    @click="reloadPointSystem"
+                                    :loading="reloading">
+                                    <b-icon icon="refresh"></b-icon>
+                                    <span>Recalculate/Reload Rules</span>
+                                </b-button>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Point Rules -->
+                        <div v-if="!loadingRules">
+                            <h6 class="title is-6 has-text-success">Positive Actions:</h6>
+                            <ul>
+                                <li v-for="(rule, key) in basePointRules" :key="key" v-if="rule.enabled !== false">
+                                    <span class="has-text-success">
+                                        +{{ rule.points_per_kill || rule.points_per_headshot || rule.points_per_damage || rule.points_per_heal || rule.points_per_revive || rule.points_per_defib || rule.points_per_crown || rule.points_per_save || rule.points_per_pack || rule.points_per_finale || rule.points || 0 }}
+                                    </span>
+                                    {{ rule.description }}
+                                    <em v-if="rule.note"> ({{ rule.note }})</em>
+                                </li>
+                            </ul>
+
                             <br>
-                            <li><span class="has-text-danger">{{ penalties.teammate_kill || -500 }}</span> for teammate kill</li>
-                            <li><span class="has-text-danger">{{ penalties.friendly_fire_per_damage || -40 }}</span> per damage point dealt to teammate</li>
-                        </ul>
+                            <h6 class="title is-6 has-text-danger">Penalties:</h6>
+                            <ul>
+                                <li v-for="(rule, key) in penaltyRules" :key="key" v-if="rule.enabled !== false">
+                                    <span class="has-text-danger">
+                                        {{ rule.points_per_damage || rule.points_per_kill || rule.points_per_death || 0 }}
+                                    </span>
+                                    {{ rule.description }}
+                                    <em v-if="rule.note"> ({{ rule.note }})</em>
+                                </li>
+                            </ul>
+                        </div>
 
                         <br>
                         <p><strong>Healing Anti-Abuse System:</strong> To prevent point farming, healing points are only awarded when:</p>
@@ -91,7 +116,7 @@
                 <div class="card-content">
                     <div class="content">
                         <p>MVP is determined by calculating total points using the following formula:</p>
-                        
+
                         <h6 class="title is-6 has-text-success">Positive Actions:</h6>
                         <ul>
                             <li><strong>Special Infected Kills × 6</strong> - Reward skilled gameplay</li>
@@ -120,6 +145,8 @@
                     </div>
                 </div>
             </b-collapse>
+
+
         </div>
     </div>
     <br>
@@ -129,67 +156,94 @@
 export default {
   data() {
     return {
-      pointRules: null,
+      pointSystem: null,
       loadingRules: true,
-      rulesError: null
+      rulesError: null,
+      reloading: false
     }
   },
   async mounted() {
-    await this.loadPointRules()
+    await this.loadPointSystem()
   },
   methods: {
-    async loadPointRules() {
+    async loadPointSystem() {
       try {
         this.loadingRules = true
-        const response = await this.$http.get('/api/point-rules')
-        
+        const response = await this.$http.get('/api/point-system')
+
         if (response.data.success) {
-          this.pointRules = response.data.rules
+          this.pointSystem = response.data.config
         } else {
-          throw new Error(response.data.message || 'Failed to load point rules')
+          throw new Error(response.data.message || 'Failed to load point system')
         }
       } catch (error) {
-        console.error('Failed to load point rules:', error)
+        console.error('Failed to load point system:', error)
         this.rulesError = error.message
         // Fallback to default values if API fails
-        this.pointRules = {
-          point_values: {
-            positive_actions: {
-              common_kill: 1,
-              headshot: 2,
-              special_kill: 6,
-              tank_kill_max: 100,
-              tank_kill_solo: 20,
-              tank_kill_melee: 50,
-              witch_kill: 15,
-              heal_teammate: 40,
-              heal_teammate_critical: 60,
-              revive_teammate: 25,
-              defib_teammate: 50,
-              teammate_save: 20,
-              ammo_pack_deploy: 20,
-              finale_win: 1000
-            },
-            penalties: {
-              friendly_fire_per_damage: -40,
-              teammate_kill: -500
+        this.pointSystem = {
+          version: "fallback",
+          base_points: {
+            rules: {
+              common_kills: { points_per_kill: 1, description: "Points per common infected kill" },
+              special_infected_kills: { points_per_kill: 6, description: "Points per special infected kill" },
+              witch_kills: { points_per_kill: 15, description: "Points for killing witch" },
+              tank_kill_max: { points: 100, description: "Maximum points for tank kill contribution" },
+              first_aid_shared: { points_per_heal: 40, description: "Points for healing teammates" },
+              revive_others: { points_per_revive: 25, description: "Points for reviving teammates" },
+              finale_completion: { points_per_finale: 1000, description: "Bonus points for completing finale" }
+            }
+          },
+          penalties: {
+            rules: {
+              friendly_fire_damage: { points_per_damage: -40, description: "Penalty per HP damage dealt to teammates" },
+              teammate_kills: { points_per_kill: -500, description: "Heavy penalty for killing teammates" }
             }
           }
         }
       } finally {
         this.loadingRules = false
       }
+    },
+
+    async reloadPointSystem() {
+      try {
+        this.reloading = true
+        const response = await this.$http.post('/api/point-system/reload')
+
+        if (response.data.success) {
+          await this.loadPointSystem()
+          this.$buefy.toast.open({
+            message: 'Point system reloaded successfully!',
+            type: 'is-success',
+            duration: 3000
+          })
+        } else {
+          throw new Error(response.data.message || 'Failed to reload point system')
+        }
+      } catch (error) {
+        console.error('Failed to reload point system:', error)
+        this.$buefy.toast.open({
+          message: `Failed to reload: ${error.message}`,
+          type: 'is-danger',
+          duration: 5000
+        })
+      } finally {
+        this.reloading = false
+      }
     }
   },
   computed: {
-    rules() {
-      return this.pointRules?.point_values || {}
+    basePointRules() {
+      return this.pointSystem?.base_points?.rules || {}
     },
-    positiveActions() {
-      return this.rules.positive_actions || {}
+    penaltyRules() {
+      return this.pointSystem?.penalties?.rules || {}
     },
-    penalties() {
-      return this.rules.penalties || {}
+    systemVersion() {
+      return this.pointSystem?.version || 'Unknown'
+    },
+    lastUpdated() {
+      return this.pointSystem?.last_updated || 'Unknown'
     }
   }
 }

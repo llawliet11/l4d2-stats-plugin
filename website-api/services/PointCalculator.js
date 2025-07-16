@@ -5,16 +5,26 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Singleton instance
+let instance = null;
+
 class PointCalculator {
     constructor() {
+        if (instance) {
+            return instance;
+        }
+
         this.config = null;
+        this.configPath = path.join(__dirname, '../config/point-system.json');
         this.loadConfig();
+
+        instance = this;
+        return instance;
     }
 
     loadConfig() {
         try {
-            const configPath = path.join(__dirname, '../config/point-system.json');
-            const configData = fs.readFileSync(configPath, 'utf8');
+            const configData = fs.readFileSync(this.configPath, 'utf8');
             this.config = JSON.parse(configData);
             console.log(`Point system config loaded (version ${this.config.version})`);
         } catch (error) {
@@ -22,6 +32,17 @@ class PointCalculator {
             throw new Error('Point system configuration not available');
         }
     }
+
+    /**
+     * Reload the configuration from file
+     */
+    reloadConfig() {
+        console.log('Reloading point system configuration...');
+        this.loadConfig();
+        console.log('Point system configuration reloaded successfully');
+    }
+
+
 
     /**
      * Calculate points for a single session/game

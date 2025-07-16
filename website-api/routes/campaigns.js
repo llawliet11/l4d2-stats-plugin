@@ -3,6 +3,7 @@ const router = Router()
 import routeCache from 'route-cache'
 import fs from 'fs'
 import path from 'path'
+import MVPCalculator from '../services/MVPCalculator.js'
 
 // Load calculation rules from config file
 const configPath = path.join(process.cwd(), 'config', 'calculation-rules.json')
@@ -190,67 +191,8 @@ export default function(pool) {
             
             const [rows] = await pool.query(query, params)
             
-            // Use the already loaded calculationRules from the top level
-            
-            // Calculate MVP points for each user using the same logic as sessions API
-            const pointValues = calculationRules.point_values || {
-                positive_actions: {
-                    common_kill: 1, special_kill: 6, tank_kill_max: 100, witch_kill: 15,
-                    heal_teammate: 40, revive_teammate: 25, defib_teammate: 30, finale_win: 1000,
-                    molotov_use: 5, pipe_use: 5, bile_use: 5, pill_use: 10, adrenaline_use: 15
-                },
-                penalties: { teammate_kill: -100 }
-            };
-            
-            // Calculate average damage taken for bonus calculation
-            const totalDamageTaken = rows.reduce((sum, row) => sum + (row.DamageTaken || 0), 0);
-            const avgDamageTaken = rows.length > 0 ? totalDamageTaken / rows.length : 0;
-            
-            // Calculate MVP points for each user using comprehensive criteria
-            rows.forEach(row => {
-                let mvpPoints = 0;
-                
-                // Positive actions (using corrected data from stats_map_users)
-                mvpPoints += (row.SpecialInfectedKills || 0) * (pointValues.positive_actions.special_kill || 6);
-                mvpPoints += (row.ZombieKills || 0) * (pointValues.positive_actions.common_kill || 1);
-                mvpPoints += (row.tanks_killed || 0) * (pointValues.positive_actions.tank_kill_max || 100);
-                mvpPoints += (row.kills_witch || 0) * (pointValues.positive_actions.witch_kill || 15);
-                mvpPoints += (row.MedkitsUsed || 0) * (pointValues.positive_actions.heal_teammate || 40);
-                mvpPoints += (row.revived_others || 0) * (pointValues.positive_actions.revive_teammate || 25);
-                mvpPoints += (row.defibs_used || 0) * (pointValues.positive_actions.defib_teammate || 30);
-                mvpPoints += (row.finales_won || 0) * (pointValues.positive_actions.finale_win || 1000);
-                
-                // Additional positive actions
-                mvpPoints += (row.throws_molotov || 0) * (pointValues.positive_actions.molotov_use || 5);
-                mvpPoints += (row.throws_pipe || 0) * (pointValues.positive_actions.pipe_use || 5);
-                mvpPoints += (row.throws_puke || 0) * (pointValues.positive_actions.bile_use || 5);
-                mvpPoints += (row.pills_used || 0) * (pointValues.positive_actions.pill_use || 10);
-                mvpPoints += (row.adrenaline_used || 0) * (pointValues.positive_actions.adrenaline_use || 15);
-                
-                // Penalties
-                mvpPoints += (row.ff_kills || 0) * (pointValues.penalties.teammate_kill || -100);
-                mvpPoints -= (row.SurvivorDamage || 0) * 2; // -2 per friendly fire damage
-                
-                // Damage taken bonus (reward for taking less damage than average)
-                const damageTakenBonus = Math.max(0, (avgDamageTaken - (row.DamageTaken || 0)) * 0.5);
-                mvpPoints += damageTakenBonus;
-                
-                row.mvpPoints = Math.round(mvpPoints);
-                row.SurvivorFFCount = Math.round((row.SurvivorDamage || 0) / 10); // Estimate for display
-            });
-            
-            // Sort users by MVP points to determine overall MVP
-            const sortedUsers = [...rows].sort((a, b) => (b.mvpPoints || 0) - (a.mvpPoints || 0));
-            
-            // Mark the overall MVP (highest MVP points)
-            if (sortedUsers.length > 0) {
-                const mvpSteamId = sortedUsers[0].steamid;
-                rows.forEach(row => {
-                    if (row.steamid === mvpSteamId) {
-                        row.isMVP = true;
-                    }
-                });
-            }
+            // Calculate MVP using the centralized MVP calculator
+            MVPCalculator.calculateAndMarkMVP(rows);
             
             res.json(rows)
         }catch(err) {
@@ -485,35 +427,49 @@ export default function(pool) {
                 SELECT
                     smu.steamid,
                     smu.last_alias,
+                    0 as points,
                     smu.mapid,
                     smu.session_start,
                     smu.session_end,
                     NULL as ping,
+                    -- Return actual database column names
                     smu.common_kills,
                     smu.melee_kills,
-                    smu.survivor_damage_rec as damage_taken,
-                    smu.survivor_ff as friendly_fire_count,
-                    smu.survivor_ff_rec as friendly_fire_damage,
-                    smu.throws_molotov as molotovs_used,
-                    smu.throws_pipe as pipebombs_used,
-                    smu.boomer_mellos as biles_used,
-                    (smu.heal_others + smu.heal_self) as kits_used,
-                    smu.survivor_incaps as incaps,
-                    smu.survivor_deaths as deaths,
+                    smu.survivor_damage_rec,
+                    smu.survivor_ff,
+                    smu.survivor_ff_rec,
+                    smu.throws_molotov,
+                    smu.throws_pipe,
+                    smu.throws_puke,
+                    smu.heal_others,
+                    smu.survivor_incaps,
+                    smu.survivor_deaths,
                     smu.clowns_honked as total_honks,
+                    smu.tanks_killed,
+                    smu.kills_witch,
+                    smu.ff_kills,
+                    smu.revived_others,
+                    smu.defibs_used,
+                    smu.finales_won,
+                    smu.pills_used,
+                    smu.adrenaline_used,
                     -- Calculate special infected kills
                     CAST((COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) +
                      COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) +
-                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) AS UNSIGNED) as specials_killed,
-                    -- Format session times
+                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) AS UNSIGNED) as special_infected_kills,
+                    -- Calculate totals
+                    (smu.throws_molotov + smu.throws_pipe + smu.throws_puke) as total_throwables,
+                    (smu.pills_used + smu.adrenaline_used) as total_pills_shots,
+                    -- Session-specific fields
                     FROM_UNIXTIME(smu.session_start) as session_start_formatted,
                     FROM_UNIXTIME(smu.session_end) as session_end_formatted,
-                    -- Calculate session duration in minutes
                     CASE
                         WHEN smu.session_end > smu.session_start
                         THEN ROUND((smu.session_end - smu.session_start) / 60, 1)
                         ELSE NULL
-                    END as session_duration_minutes
+                    END as session_duration_minutes,
+                    smu.mapid as map,
+                    'Normal' as difficulty
                 FROM stats_map_users smu
                 WHERE smu.mapid = ?
                 ORDER BY smu.session_start DESC
@@ -545,18 +501,19 @@ export default function(pool) {
             let validDurationCount = 0;
 
             playerStats.forEach(player => {
+                // Use actual database column names
                 aggregatedStats.total_zombies_killed += parseInt(player.common_kills) || 0;
-                aggregatedStats.total_specials_killed += parseInt(player.specials_killed) || 0;
+                aggregatedStats.total_specials_killed += parseInt(player.special_infected_kills) || 0;
                 aggregatedStats.total_melee_kills += parseInt(player.melee_kills) || 0;
-                aggregatedStats.total_damage_taken += parseInt(player.damage_taken) || 0;
-                aggregatedStats.total_friendly_fire_count += parseInt(player.friendly_fire_count) || 0;
-                aggregatedStats.total_friendly_fire_damage += parseInt(player.friendly_fire_damage) || 0;
-                aggregatedStats.total_molotovs_used += parseInt(player.molotovs_used) || 0;
-                aggregatedStats.total_pipebombs_used += parseInt(player.pipebombs_used) || 0;
-                aggregatedStats.total_biles_used += parseInt(player.biles_used) || 0;
-                aggregatedStats.total_kits_used += parseInt(player.kits_used) || 0;
-                aggregatedStats.total_incaps += parseInt(player.incaps) || 0;
-                aggregatedStats.total_deaths += parseInt(player.deaths) || 0;
+                aggregatedStats.total_damage_taken += parseInt(player.survivor_damage_rec) || 0;
+                aggregatedStats.total_friendly_fire_count += parseInt(player.survivor_ff) || 0;
+                aggregatedStats.total_friendly_fire_damage += parseInt(player.survivor_ff_rec) || 0;
+                aggregatedStats.total_molotovs_used += parseInt(player.throws_molotov) || 0;
+                aggregatedStats.total_pipebombs_used += parseInt(player.throws_pipe) || 0;
+                aggregatedStats.total_biles_used += parseInt(player.throws_puke) || 0;
+                aggregatedStats.total_kits_used += parseInt(player.heal_others) || 0;
+                aggregatedStats.total_incaps += parseInt(player.survivor_incaps) || 0;
+                aggregatedStats.total_deaths += parseInt(player.survivor_deaths) || 0;
                 aggregatedStats.total_honks += parseInt(player.total_honks) || 0;
 
                 // Skip ping calculation since it's not available in stats_map_users
@@ -575,6 +532,9 @@ export default function(pool) {
             aggregatedStats.avg_ping = 0; // Not available in stats_map_users
             aggregatedStats.avg_session_duration = validDurationCount > 0 ?
                 Math.round((totalDuration / validDurationCount) * 10) / 10 : 0;
+
+            // Calculate MVP using the centralized MVP calculator
+            MVPCalculator.calculateAndMarkMVP(playerStats);
 
             res.json({
                 map: mapInfo[0],

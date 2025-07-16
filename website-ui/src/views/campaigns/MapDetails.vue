@@ -45,7 +45,7 @@
         <h2 class="title is-4 has-text-centered has-text-white mb-6">Individual Player Performance</h2>
         <div class="columns is-multiline">
             <div v-for="(player, index) in mapData.player_stats" class="column is-3" :key="player.steamid">
-                <div :class="[{'bg-mvp': index === 0}, 'box', 'has-text-centered']" style="position: relative">
+                <div :class="[{'bg-mvp': player.isMVP}, 'box', 'has-text-centered']" style="position: relative">
                     <router-link :to="'/user/' + player.steamid">
                         <img class="is-inline-block is-pulled-left image is-128x128" :src="'/img/portraits/' + getCharacterName(index) + '.png'" />
                     </router-link>
@@ -58,18 +58,20 @@
                     <hr class="player-divider">
                     <ul class="has-text-right">
                         <li><span class="has-text-info">{{formatNumber(player.common_kills || 0)}}</span> commons killed</li>
-                        <li><span class="has-text-info">{{formatNumber(player.specials_killed || 0)}}</span> specials killed</li>
-                        <li><span class="has-text-info">{{formatNumber(player.friendly_fire_count || 0)}}</span> friendly fire count</li>
-                        <li><span class="has-text-info">{{formatNumber(player.friendly_fire_damage || 0)}}</span> friendly fire damage</li>
-                        <li><span class="has-text-info">{{formatNumber(player.damage_taken || 0)}}</span> damage taken</li>
+                        <li><span class="has-text-info">{{formatNumber(player.special_infected_kills || 0)}}</span> specials killed</li>
+                        <li><span class="has-text-info">{{formatNumber(player.survivor_ff || 0)}}</span> friendly fire dealt</li>
+                        <li><span class="has-text-info">{{formatNumber(player.survivor_ff_rec || 0)}}</span> friendly fire received</li>
+                        <li><span class="has-text-info">{{formatNumber(player.survivor_damage_rec || 0)}}</span> damage taken</li>
                         <li><span class="has-text-info">{{formatNumber(player.melee_kills || 0)}}</span> melee kills</li>
-                        <li><span class="has-text-info">{{formatNumber(player.incaps || 0)}}</span> incaps</li>
-                        <li><span class="has-text-info">{{formatNumber(player.deaths || 0)}}</span> deaths</li>
+                        <li><span class="has-text-info">{{formatNumber(player.survivor_incaps || 0)}}</span> incaps</li>
+                        <li><span class="has-text-info">{{formatNumber(player.survivor_deaths || 0)}}</span> deaths</li>
+                        <li><span class="has-text-info">{{formatNumber(player.heal_others || 0)}}</span> medkits used</li>
+                        <li><span class="has-text-info">{{formatNumber(player.mvpPoints || 0)}}</span> MVP points</li>
                         <li v-if="player.total_honks > 0"><span class="has-text-info">{{formatNumber(player.total_honks)}}</span> clown honks</li>
                     </ul>
                     <br>
                     <b-button type="is-info" tag="router-link" :to="'/user/' + player.steamid" expanded>View Profile</b-button>
-                    <div v-if="index === 0" class="ribbon ribbon-top-left"><span>Top Performer</span></div>
+                    <div v-if="player.isMVP" class="ribbon ribbon-top-left"><span>M.V.P</span></div>
                 </div>
             </div>
         </div>
