@@ -9,7 +9,7 @@
       "common_kills": {
         "points_per_kill": 1,
         "description": "Points per common infected kill",
-        "source_field": "ZombieKills"
+        "source_field": "common_kills"
       },
       "common_headshots": {
         "points_per_headshot": 2,
@@ -19,7 +19,7 @@
       "special_infected_kills": {
         "points_per_kill": 6,
         "description": "Points per special infected kill",
-        "source_field": "SpecialInfectedKills"
+        "source_field": "special_infected_kills"
       },
       "witch_kills": {
         "points_per_kill": 15,
@@ -29,12 +29,12 @@
       "witch_crowns": {
         "points_per_crown": 25,
         "description": "Bonus points for crowning witch",
-        "source_field": "WitchesCrowned"
+        "source_field": "witches_crowned"
       },
       "tank_damage": {
         "points_per_damage": 0.1,
         "description": "Points per damage dealt to tank",
-        "source_field": "DamageToTank"
+        "source_field": "damage_to_tank"
       },
       "tank_kill_max": {
         "points": 100,
@@ -58,24 +58,24 @@
       "first_aid_shared": {
         "points_per_heal": 40,
         "description": "Points for healing teammates",
-        "source_field": "FirstAidShared"
+        "source_field": "heal_others"
       },
       "revive_others": {
         "points_per_revive": 25,
         "description": "Points for reviving teammates",
-        "source_field": "ReviveOtherCount"
+        "source_field": "revived_others"
       },
       "defibrillator_used": {
         "points_per_defib": 30,
         "description": "Points for using defibrillator",
-        "source_field": "DefibrillatorsUsed"
+        "source_field": "defibs_used"
       },
       "teammate_save": {
         "points_per_save": 10,
         "description": "Points for saving teammates from special infected",
         "calculation": "special_kills * save_ratio",
         "save_ratio": 0.3,
-        "source_field": "SpecialInfectedKills",
+        "source_field": "special_infected_kills",
         "enabled": true
       },
       "ammo_pack_deploy": {
@@ -109,7 +109,7 @@
         "description": "Bonus points for critical heals",
         "calculation": "heals * critical_ratio",
         "critical_ratio": 0.2,
-        "source_field": "FirstAidShared",
+        "source_field": "heal_others",
         "enabled": false,
         "note": "Critical heals not tracked separately"
       },
@@ -152,7 +152,7 @@
       "friendly_fire_damage": {
         "points_per_damage": -40,
         "description": "Penalty per HP damage dealt to teammates",
-        "source_field": "SurvivorFFDamage",
+        "source_field": "survivor_ff",
         "max_penalty": -10000,
         "note": "Capped to prevent extreme penalties"
       },
@@ -164,7 +164,7 @@
       "deaths": {
         "points_per_death": -50,
         "description": "Penalty for dying",
-        "source_field": "Deaths",
+        "source_field": "survivor_deaths",
         "enabled": false,
         "note": "Currently disabled - deaths are tracked but not penalized"
       }
@@ -245,6 +245,70 @@
       "survivor_ff": 2000,
       "damage_to_tank": 50000,
       "description": "Maximum reasonable values to detect data corruption"
+    }
+  },
+
+  "mvp_calculation": {
+    "description": "MVP point calculation system for determining best player",
+    "point_values": {
+      "positive_actions": {
+        "common_kill": 1,
+        "special_kill": 6,
+        "tank_kill_max": 100,
+        "witch_kill": 15,
+        "heal_teammate": 40,
+        "revive_teammate": 25,
+        "defib_teammate": 30,
+        "finale_win": 1000,
+        "molotov_use": 5,
+        "pipe_use": 5,
+        "bile_use": 5,
+        "pill_use": 10,
+        "adrenaline_use": 15
+      },
+      "penalties": {
+        "teammate_kill": -100,
+        "ff_damage_multiplier": -2
+      },
+      "bonuses": {
+        "damage_taken_bonus_multiplier": 0.5,
+        "description": "Bonus for taking less damage than average"
+      }
+    },
+    "ranking_criteria": {
+      "description": "Fallback criteria for MVP ranking when points are tied",
+      "criteria": [
+        {
+          "field": "special_infected_kills",
+          "direction": "desc",
+          "priority": 1,
+          "description": "Special Infected Killed (highest)"
+        },
+        {
+          "field": "survivor_ff_count",
+          "direction": "asc",
+          "priority": 2,
+          "description": "Friendly Fire Count (lowest)"
+        },
+        {
+          "field": "common_kills",
+          "direction": "desc",
+          "priority": 3,
+          "description": "Common Infected Kills (highest)"
+        },
+        {
+          "field": "survivor_damage_rec",
+          "direction": "asc",
+          "priority": 4,
+          "description": "Damage Taken (lowest)"
+        },
+        {
+          "field": "survivor_ff",
+          "direction": "asc",
+          "priority": 5,
+          "description": "Friendly Fire Damage (lowest)"
+        }
+      ]
     }
   }
 }

@@ -16,12 +16,12 @@ class MVPCalculator {
      */
     loadConfig() {
         try {
-            const rulesPath = path.join(process.cwd(), 'config', 'calculation-rules.json')
-            const rulesData = fs.readFileSync(rulesPath, 'utf8')
-            const calculationRules = JSON.parse(rulesData)
-            
+            const pointSystemPath = path.join(process.cwd(), 'config', 'point-system.json')
+            const pointSystemData = fs.readFileSync(pointSystemPath, 'utf8')
+            const pointSystem = JSON.parse(pointSystemData)
+
             return {
-                pointValues: calculationRules.point_values || {
+                pointValues: pointSystem.mvp_calculation?.point_values || {
                     positive_actions: {
                         common_kill: 1,
                         special_kill: 6,
@@ -42,12 +42,12 @@ class MVPCalculator {
                         ff_damage_multiplier: -2
                     }
                 },
-                mvpCriteria: calculationRules.mvp_calculation?.criteria || [
-                    { field: "SpecialInfectedKills", direction: "desc" },
-                    { field: "SurvivorFFCount", direction: "asc" },
-                    { field: "ZombieKills", direction: "desc" },
-                    { field: "DamageTaken", direction: "asc" },
-                    { field: "SurvivorDamage", direction: "asc" }
+                mvpCriteria: pointSystem.mvp_calculation?.ranking_criteria?.criteria || [
+                    { field: "special_infected_kills", direction: "desc" },
+                    { field: "survivor_ff_count", direction: "asc" },
+                    { field: "common_kills", direction: "desc" },
+                    { field: "survivor_damage_rec", direction: "asc" },
+                    { field: "survivor_ff", direction: "asc" }
                 ]
             }
         } catch (err) {
