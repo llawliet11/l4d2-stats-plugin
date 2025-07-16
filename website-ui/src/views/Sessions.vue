@@ -46,18 +46,22 @@
                 </div>
             </div>
         </div>
-        <b-table
-            :data="sessions"
-            :loading="loading"
 
-            paginated
-            backend-pagination
-            :current-page="current_page"
-            per-page=12
-            :total="total_sessions"
-            @page-change="onPageChange"
-
-        >
+        <!-- Beautiful Scrollable Table Container -->
+        <div class="table-container">
+            <div class="table-wrapper">
+                <b-table
+                    :data="sessions"
+                    :loading="loading"
+                    paginated
+                    backend-pagination
+                    :current-page="current_page"
+                    per-page=12
+                    :total="total_sessions"
+                    @page-change="onPageChange"
+                    :mobile-cards="false"
+                    class="beautiful-table"
+                >
         <!-- TODO: background sort -->
                 <b-table-column v-slot="props" label="View">
                     <b-button tag="router-link" :to="'/user/' + props.row.steamid" expanded type="is-info"> View Profile</b-button>
@@ -113,14 +117,16 @@
             <template #detail="props">
               <pre>{{props.row}}</pre>
             </template>
-            <template slot="empty">
-                <section class="section">
-                    <div class="content has-text-grey has-text-centered">
-                        <p>There are no recorded sessions</p>
-                    </div>
-                </section>
-            </template>
-        </b-table>
+                <template slot="empty">
+                    <section class="section">
+                        <div class="content has-text-grey has-text-centered">
+                            <p>There are no recorded sessions</p>
+                        </div>
+                    </section>
+                </template>
+            </b-table>
+            </div>
+        </div>
     </div>
 </div>
 </template>
@@ -207,23 +213,220 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 }
 </script>
 <style>
+/* Beautiful Scrollable Table Styles */
+.table-container {
+    background: #167df0;
+    border-radius: 15px;
+    padding: 5px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    margin: 10px 0;
+}
+
+.table-wrapper {
+    background: white;
+    border-radius: 12px;
+    overflow: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    max-height: 80vh;
+    position: relative;
+    /* Enable both horizontal and vertical scrolling */
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+/* Horizontal scrollbar */
+.table-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+    background: #167df0;
+    border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #1366d6;
+}
+
+/* Corner where scrollbars meet */
+.table-wrapper::-webkit-scrollbar-corner {
+    background: #f1f1f1;
+}
+
+.beautiful-table {
+    margin-bottom: 0 !important;
+}
+
+.beautiful-table .table {
+    margin-bottom: 0;
+    border-radius: 0;
+    background: white;
+    min-width: 1200px; /* Force horizontal scroll on smaller screens */
+    width: 100%;
+}
+
+.beautiful-table .table thead th {
+    background: #1366d6;
+    color: white;
+    border: none;
+    padding: 15px 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.beautiful-table .table tbody tr {
+    transition: all 0.3s ease;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.beautiful-table .table tbody tr:hover {
+    background: rgba(22, 125, 240, 0.08);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.beautiful-table .table tbody tr:nth-child(even) {
+    background-color: #fafafa;
+}
+
+.beautiful-table .table tbody tr:nth-child(even):hover {
+    background: rgba(22, 125, 240, 0.12);
+}
+
+.beautiful-table .table td {
+    vertical-align: middle;
+    padding: 12px 10px;
+    border: none;
+    font-size: 0.9rem;
+}
+
 .number-cell {
-  color: blue;
+    color: #167df0 !important;
+    font-weight: 600;
+    font-family: 'Monaco', 'Menlo', monospace;
 }
-.table td {
-    vertical-align: middle;;
-}
+
 .mvp-badge {
-    background-color: #ffdd57;
-    color: #363636;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 0.75rem;
+    background: #ffd700;
+    color: #2c3e50;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
     font-weight: bold;
-    margin-left: 6px;
+    margin-left: 8px;
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
+
 .mvp-points-cell {
-    color: #23d160 !important;
+    color: #27ae60 !important;
     font-weight: bold;
+    font-size: 1rem;
+    text-shadow: 0 1px 2px rgba(39, 174, 96, 0.2);
+}
+
+.beautiful-table .pagination-wrapper {
+    background: white;
+    padding: 15px 20px;
+    border-top: 1px solid #f5f5f5;
+}
+
+.beautiful-table .button {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.beautiful-table .button.is-info {
+    background: #167df0;
+    border: none;
+    color: white;
+}
+
+.beautiful-table .button.is-info:hover {
+    background: #1366d6;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(22, 125, 240, 0.3);
+}
+
+/* Scroll indicators */
+.table-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 20px;
+    height: 100%;
+    background: linear-gradient(to left, rgba(255,255,255,0.8), transparent);
+    pointer-events: none;
+    z-index: 5;
+}
+
+.table-wrapper::after {
+    content: '';
+    position: absolute;
+    bottom: 10px;
+    right: 20px;
+    background: rgba(22, 125, 240, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table-container {
+        padding: 10px;
+        margin: 10px 0;
+    }
+
+    .table-wrapper {
+        max-height: 70vh;
+    }
+
+    .beautiful-table .table {
+        min-width: 800px; /* Smaller min-width for mobile */
+    }
+
+    .beautiful-table .table thead th {
+        padding: 8px 6px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+    }
+
+    .beautiful-table .table td {
+        padding: 8px 6px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+
+    .table-wrapper::after {
+        content: 'Swipe →';
+        bottom: 5px;
+        right: 10px;
+        font-size: 0.7rem;
+    }
+}
+
+/* Loading state styling */
+.beautiful-table .loading-overlay {
+    /* background: rgba(255, 255, 255, 0.95); */
+    /* backdrop-filter: blur(4px); */
 }
 </style>
