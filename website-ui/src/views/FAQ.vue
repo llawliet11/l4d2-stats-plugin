@@ -117,26 +117,26 @@
 
                         <h6 class="title is-6 has-text-success">Positive Actions:</h6>
                         <ul>
-                            <li><strong>Special Infected Kills × 6</strong> - Reward skilled gameplay</li>
-                            <li><strong>Common Kills × 1</strong> - Basic zombie clearing</li>
-                            <li><strong>Tank Kills × 100</strong> - Major threat elimination</li>
-                            <li><strong>Witch Kills × 15</strong> - Precision kills</li>
-                            <li><strong>Heals × 40</strong> - Team support</li>
-                            <li><strong>Revives × 25</strong> - Saving teammates</li>
-                            <li><strong>Defibs × 30</strong> - Critical rescues</li>
-                            <li><strong>Finales Won × 1000</strong> - Campaign completion</li>
-                            <li><strong>Molotovs Used × 5</strong> - Tactical throwables</li>
-                            <li><strong>Pipe Bombs Used × 5</strong> - Area control</li>
-                            <li><strong>Bile Bombs Used × 5</strong> - Distraction tactics</li>
-                            <li><strong>Pills Used × 10</strong> - Self-care</li>
-                            <li><strong>Adrenaline Used × 15</strong> - Speed boost usage</li>
-                            <li><strong>Damage Taken Bonus × 0.5</strong> - Reward for taking less damage than average</li>
+                            <li><strong>Special Infected Kills × {{ mvpPositiveActions.special_kill || 6 }}</strong> - Reward skilled gameplay</li>
+                            <li><strong>Common Kills × {{ mvpPositiveActions.common_kill || 1 }}</strong> - Basic zombie clearing</li>
+                            <li><strong>Tank Kills × {{ mvpPositiveActions.tank_kill_max || 100 }}</strong> - Major threat elimination</li>
+                            <li><strong>Witch Kills × {{ mvpPositiveActions.witch_kill || 15 }}</strong> - Precision kills</li>
+                            <li><strong>Heals × {{ mvpPositiveActions.heal_teammate || 40 }}</strong> - Team support</li>
+                            <li><strong>Revives × {{ mvpPositiveActions.revive_teammate || 25 }}</strong> - Saving teammates</li>
+                            <li><strong>Defibs × {{ mvpPositiveActions.defib_teammate || 30 }}</strong> - Critical rescues</li>
+                            <li><strong>Finales Won × {{ mvpPositiveActions.finale_win || 1000 }}</strong> - Campaign completion</li>
+                            <li><strong>Molotovs Used × {{ mvpPositiveActions.molotov_use || 5 }}</strong> - Tactical throwables</li>
+                            <li><strong>Pipe Bombs Used × {{ mvpPositiveActions.pipe_use || 5 }}</strong> - Area control</li>
+                            <li><strong>Bile Bombs Used × {{ mvpPositiveActions.bile_use || 5 }}</strong> - Distraction tactics</li>
+                            <li><strong>Pills Used × {{ mvpPositiveActions.pill_use || 10 }}</strong> - Self-care</li>
+                            <li><strong>Adrenaline Used × {{ mvpPositiveActions.adrenaline_use || 15 }}</strong> - Speed boost usage</li>
+                            <li><strong>Damage Taken Bonus × {{ mvpPointValues.bonuses?.damage_taken_bonus_multiplier || 0.5 }}</strong> - Reward for taking less damage than average</li>
                         </ul>
 
                         <h6 class="title is-6 has-text-danger">Penalties:</h6>
                         <ul>
-                            <li><strong>Teammate Kills × -100</strong> - Severe penalty</li>
-                            <li><strong>Friendly Fire Damage × -2</strong> - Per damage point dealt to teammates</li>
+                            <li><strong>Teammate Kills × {{ mvpPenalties.teammate_kill || -100 }}</strong> - Severe penalty</li>
+                            <li><strong>Friendly Fire Damage × {{ mvpPenalties.ff_damage_multiplier || -2 }}</strong> - Per damage point dealt to teammates</li>
                         </ul>
 
                         <p><strong>The player with the highest MVP Points total is awarded MVP.</strong> This system rewards good teamwork, skilled gameplay, and penalizes excessive friendly fire.</p>
@@ -236,6 +236,15 @@ export default {
     },
     penaltyRules() {
       return this.pointSystem?.penalties?.rules || {}
+    },
+    mvpPointValues() {
+      return this.pointSystem?.mvp_calculation?.point_values || {}
+    },
+    mvpPositiveActions() {
+      return this.mvpPointValues?.positive_actions || {}
+    },
+    mvpPenalties() {
+      return this.mvpPointValues?.penalties || {}
     },
     systemVersion() {
       return this.pointSystem?.version || 'Unknown'

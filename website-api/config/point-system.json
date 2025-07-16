@@ -268,7 +268,7 @@
       },
       "penalties": {
         "teammate_kill": -100,
-        "ff_damage_multiplier": -2
+        "ff_damage_multiplier": -3
       },
       "bonuses": {
         "damage_taken_bonus_multiplier": 0.5,
