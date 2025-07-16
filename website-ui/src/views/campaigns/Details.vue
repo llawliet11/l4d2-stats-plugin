@@ -390,10 +390,10 @@ export default {
 }
 .ribbon-honk::before,
 .ribbon-honk::after {
-  border: 5px solid #a025d1;
+  border: 5px solid #167df0;
 }
 .ribbon-honk span {
-  background-color: #a025d1;
+  background-color: #167df0;
 }
 
 @import url('../../css/ribbon.css')

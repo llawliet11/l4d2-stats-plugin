@@ -238,4 +238,22 @@ html, body {
 #nav a.router-link-exact-active {
   color: #42b983;
 }
+
+/* Global pagination overrides */
+.pagination-link.is-current {
+  background-color: #167df0 !important;
+  border-color: #167df0 !important;
+  color: white !important;
+}
+
+.pagination-link:hover {
+  background-color: #1366d6 !important;
+  border-color: #1366d6 !important;
+  color: white !important;
+}
+
+.pagination-link:focus {
+  background-color: #1366d6 !important;
+  border-color: #1366d6 !important;
+}
 </style>

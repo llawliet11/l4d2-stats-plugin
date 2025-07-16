@@ -236,4 +236,13 @@ export default {
   height: 15px !important;
   width: 15px !important;
 }
+
+/* Override carousel indicator colors */
+.carousel .carousel-indicator .indicator-item .indicator-style.is-dots {
+  background-color: #167df0 !important;
+}
+
+.carousel .carousel-indicator .indicator-item:not(.is-active) .indicator-style.is-dots {
+  background-color: rgba(22, 125, 240, 0.3) !important;
+}
 </style>
