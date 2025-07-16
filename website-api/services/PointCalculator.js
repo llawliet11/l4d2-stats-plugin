@@ -85,6 +85,9 @@ class PointCalculator {
         const baseRules = this.config.base_points.rules;
         
         for (const [ruleName, rule] of Object.entries(baseRules)) {
+            // Skip disabled rules
+            if (rule.enabled === false) continue;
+            
             let points = 0;
             let value = 0;
 
