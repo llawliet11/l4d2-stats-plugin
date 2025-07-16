@@ -173,11 +173,57 @@ export default {
 </script>
 
 <style>
+/* Global background color */
+:root {
+  background-color: #b8b8b8;
+}
+
+html, body {
+  background-color: #b8b8b8;
+  min-height: 100vh;
+}
+
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
+  background-color: #b8b8b8;
+  min-height: 100vh;
+}
+
+/* Header/Navbar styling */
+.navbar {
+  background-color: #167df0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand .navbar-item,
+.navbar-start .navbar-item,
+.navbar-end .navbar-item {
+  color: white !important;
+}
+
+.navbar-brand .navbar-item:hover,
+.navbar-start .navbar-item:hover,
+.navbar-end .navbar-item:hover {
+  background-color: #1366d6 !important;
+  color: white !important;
+}
+
+.navbar-brand .title {
+  color: white !important;
+}
+
+/* Search button styling */
+.navbar .button.is-info {
+  background-color: #1366d6;
+  border-color: #1366d6;
+}
+
+.navbar .button.is-info:hover {
+  background-color: #0f5bb8;
+  border-color: #0f5bb8;
 }
 
 #nav {

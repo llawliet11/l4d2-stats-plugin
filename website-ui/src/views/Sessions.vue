@@ -216,7 +216,7 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 /* Beautiful Scrollable Table Styles */
 .table-container {
     background: #167df0;
-    border-radius: 15px;
+    border-radius: 4px;
     padding: 5px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     margin: 10px 0;
@@ -224,7 +224,7 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 
 .table-wrapper {
     background: white;
-    border-radius: 12px;
+    border-radius: 4px;
     overflow: auto;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     max-height: 80vh;
@@ -321,7 +321,7 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
     background: #ffd700;
     color: #2c3e50;
     padding: 4px 8px;
-    border-radius: 20px;
+    border-radius: 4px;
     font-size: 0.7rem;
     font-weight: bold;
     margin-left: 8px;
@@ -341,10 +341,54 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
     background: white;
     padding: 15px 20px;
     border-top: 1px solid #f5f5f5;
+    display: flex;
+    justify-content: center;
+}
+
+.beautiful-table .pagination {
+    justify-content: center !important;
+}
+
+/* Force center pagination with higher specificity */
+.beautiful-table .b-table .pagination,
+.beautiful-table .table-wrapper + .pagination,
+.beautiful-table .pagination-wrapper .pagination {
+    justify-content: center !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    display: flex !important;
+}
+
+/* Blue pagination styling */
+.beautiful-table .pagination-link,
+.beautiful-table .pagination-previous,
+.beautiful-table .pagination-next {
+    background: #167df0;
+    border-color: #167df0;
+    color: white;
+}
+
+.beautiful-table .pagination-link:hover,
+.beautiful-table .pagination-previous:hover,
+.beautiful-table .pagination-next:hover {
+    background: #1366d6;
+    border-color: #1366d6;
+    color: white;
+}
+
+.beautiful-table .pagination-link.is-current {
+    background: #1366d6;
+    border-color: #1366d6;
+    color: white;
+}
+
+.beautiful-table .b-table .table-wrapper .pagination-wrapper {
+    display: flex;
+    justify-content: center;
 }
 
 .beautiful-table .button {
-    border-radius: 8px;
+    border-radius: 4px;
     font-weight: 500;
     transition: all 0.3s ease;
 }
@@ -426,7 +470,7 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 
 /* Loading state styling */
 .beautiful-table .loading-overlay {
-    /* background: rgba(255, 255, 255, 0.95); */
-    /* backdrop-filter: blur(4px); */
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
 }
 </style>
