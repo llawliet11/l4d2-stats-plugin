@@ -10,3 +10,6 @@ databases.cfg
 
 # Backup files containing personal information
 backups/
+
+# ignore apple 
+.DS_Store

@@ -342,28 +342,33 @@ export default function(pool) {
             const pointCalculator = new PointCalculator();
             console.log('[/api/recalculate] Loaded point system configuration');
             
-            // Clear existing points
-            await pool.execute("DELETE FROM stats_points");
-            console.log('[/api/recalculate] Cleared existing points');
+            // Update kills_all_specials for all users before point calculation
+            await pool.execute(`
+                UPDATE stats_users 
+                SET kills_all_specials = kills_smoker + kills_boomer + kills_hunter + kills_spitter + kills_jockey + kills_charger
+            `);
+            console.log('[/api/recalculate] Updated kills_all_specials for all users');
             
-            // Reset user points to 0
-            await pool.execute("UPDATE stats_users SET points = 0");
-            console.log('[/api/recalculate] Reset user points to 0');
+            // Update kills_all_specials for all map users as well
+            await pool.execute(`
+                UPDATE stats_map_users 
+                SET kills_all_specials = kills_smoker + kills_boomer + kills_hunter + kills_spitter + kills_jockey + kills_charger
+            `);
+            console.log('[/api/recalculate] Updated kills_all_specials for all map users');
             
-            // Get all game sessions ordered by date
-            const [sessions] = await pool.execute(`
-                SELECT * FROM stats_games 
-                WHERE date_end > 0 AND date_start > 0 
-                ORDER BY date_end ASC
+            // Get all users from stats_users table
+            const [users] = await pool.execute(`
+                SELECT * FROM stats_users 
+                ORDER BY steamid ASC
             `);
             
-            console.log(`[/api/recalculate] Processing ${sessions.length} sessions...`);
+            console.log(`[/api/recalculate] Processing ${users.length} users...`);
             
-            if (sessions.length === 0) {
+            if (users.length === 0) {
                 return res.json({
                     success: false,
-                    message: 'No valid sessions found to process',
-                    stats: { sessions_processed: 0 }
+                    message: 'No users found to process',
+                    stats: { users_processed: 0 }
                 });
             }
             
@@ -371,52 +376,44 @@ export default function(pool) {
             let totalPointsCalculated = 0;
             const batchSize = 100;
 
-            for (let i = 0; i < sessions.length; i += batchSize) {
-                const batch = sessions.slice(i, i + batchSize);
+            for (let i = 0; i < users.length; i += batchSize) {
+                const batch = users.slice(i, i + batchSize);
 
-                for (const session of batch) {
-                    // Calculate points using new point system
-                    const pointBreakdown = pointCalculator.calculateSessionPoints(session);
+                for (const user of batch) {
+                    // Calculate points using new point system based on user's cumulative stats
+                    const pointBreakdown = pointCalculator.calculateSessionPoints(user);
                     let points = pointBreakdown.total;
 
-                    // Validate session data
-                    const warnings = pointCalculator.validateSessionData(session);
+                    // Validate user data
+                    const warnings = pointCalculator.validateSessionData(user);
                     if (warnings.length > 0) {
-                        console.warn(`Session ${session.id} validation warnings:`, warnings);
+                        console.warn(`User ${user.steamid} validation warnings:`, warnings);
                     }
 
                     // Limit points range to prevent database overflow
                     points = Math.max(-50000, Math.min(50000, points));
                     
-                    // Allow negative points but track total
+                    // Track total points calculated
                     totalPointsCalculated += points;
                     
-                    if (Math.abs(points) > 0) { // Record both positive and negative points
-                        // Insert point record (type should be an integer, not a string)
-                        await pool.execute(
-                            "INSERT INTO stats_points (steamid, timestamp, type, amount) VALUES (?, ?, ?, ?)",
-                            [session.steamid, session.date_end, 0, points]
-                        );
-                        
-                        // Update user total (allow negative points by removing GREATEST constraint)
-                        await pool.execute(
-                            "UPDATE stats_users SET points = points + ? WHERE steamid = ?",
-                            [points, session.steamid]
-                        );
-                        
-                        // Debug log for first few sessions
-                        if (processedCount < 5) {
-                            console.log(`[/api/recalculate] Session ${processedCount + 1}: ${session.steamid} earned ${points} points`);
-                            console.log(`  - Zombies: ${session.ZombieKills || 0}, Specials: ${session.SpecialInfectedKills || 0}`);
-                            console.log(`  - FF Damage: ${session.SurvivorDamage || 0}, Finale: ${session.finale_time > 0 ? 'Yes' : 'No'}`);
-                        }
+                    // Update user points directly in stats_users table
+                    await pool.execute(
+                        "UPDATE stats_users SET points = ? WHERE steamid = ?",
+                        [points, user.steamid]
+                    );
+                    
+                    // Debug log for first few users
+                    if (processedCount < 5) {
+                        console.log(`[/api/recalculate] User ${processedCount + 1}: ${user.steamid} calculated ${points} points`);
+                        console.log(`  - Common Kills: ${user.common_kills || 0}, Special Kills: ${user.kills_all_specials || 0}`);
+                        console.log(`  - FF Damage: ${user.survivor_ff || 0}, Finales Won: ${user.finales_won || 0}`);
                     }
                     
                     processedCount++;
                 }
                 
                 // Log progress every batch
-                console.log(`[/api/recalculate] Processed ${Math.min(i + batchSize, sessions.length)}/${sessions.length} sessions`);
+                console.log(`[/api/recalculate] Processed ${Math.min(i + batchSize, users.length)}/${users.length} users`);
             }
             
             // Get final stats
@@ -436,7 +433,7 @@ export default function(pool) {
                 success: true,
                 message: 'Points recalculated successfully',
                 stats: {
-                    sessions_processed: processedCount,
+                    users_processed: processedCount,
                     total_points_calculated: totalPointsCalculated,
                     ...finalStats[0]
                 }

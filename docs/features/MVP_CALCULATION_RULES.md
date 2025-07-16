@@ -1,97 +1,94 @@
 # MVP Calculation Rules
 
-This document outlines the comprehensive MVP (Most Valuable Player) calculation system for the L4D2 Stats Plugin.
-
 ## Overview
 
-The MVP system uses a points-based calculation that considers various gameplay actions, teamwork contributions, and penalties. The player with the highest total MVP points is awarded MVP status.
+The L4D2 Stats Plugin implements **two types of MVP calculations** with configurable point systems that evaluate player performance based on positive contributions and penalties.
 
-## Point Values
+## 🚨 **Configuration-Driven System**
+
+**ALL MVP rules are defined in `point-system.json` and are fully configurable.**
+- Point values can be adjusted without code changes
+- Penalties can be modified to suit server philosophy
+- Rules can be enabled/disabled as needed
+
+## Two Types of MVP
+
+### 1. MVP All Time (Global Champion)
+- **Scope**: Best player across ALL maps and campaigns
+- **Data Source**: Lifetime cumulative statistics
+- **Purpose**: Overall champion recognition
+
+### 2. MVP of Map (Map Champion)
+- **Scope**: Best player for a specific map/campaign
+- **Data Source**: Map-specific statistics
+- **Purpose**: Map-specific champion recognition
+
+## Current Point Values (Configurable)
 
 ### Positive Actions
+- **Common Infected Kills**: 1 point per kill
+- **Special Infected Kills**: 6 points per kill
+- **Tank Kills**: Up to 100 points per kill
+- **Witch Kills**: 15 points per kill
+- **Finale Wins**: 1000 points per completion
+- **Healing Teammates**: 40 points per heal
+- **Reviving Teammates**: 25 points per revive
+- **Defibrillating Teammates**: 30 points per defib
+- **Item Usage**: 5-15 points per use (molotov, pipe, bile, pills, adrenaline)
 
-#### Combat Actions
-- **Common Infected Kills**: +1 point per kill
-- **Special Infected Kills**: +6 points per kill
-- **Tank Kills**: +100 points per kill
-- **Witch Kills**: +15 points per kill
-- **Finale Wins**: +1000 points per completion
-
-#### Teamwork & Support
-- **Healing Teammates**: +40 points per heal
-- **Reviving Teammates**: +25 points per revive
-- **Defibrillating Teammates**: +30 points per defib
-
-#### Item Usage
-- **Molotov Usage**: +5 points per use
-- **Pipe Bomb Usage**: +5 points per use
-- **Bile Bomb Usage**: +5 points per use
-- **Pills Usage**: +10 points per use
-- **Adrenaline Usage**: +15 points per use
-
-#### Damage Management
-- **Damage Taken Bonus**: +(average_damage_taken - player_damage_taken) × 0.5
-  - Rewards players who take less damage than the team average
-
-### Penalties
-
+### Current Penalties (Configurable)
 - **Teammate Kills**: -100 points per friendly kill
-- **Friendly Fire Damage**: -2 points per damage point dealt to teammates
+- **Friendly Fire Damage**: -3 multiplier per damage point
 
-## Calculation Formula
+**Note**: These are current configuration values and can be changed in `point-system.json`.
 
-```
-MVP Points = 
-  (Special Kills × 6) +
-  (Common Kills × 1) +
-  (Tank Kills × 100) +
-  (Witch Kills × 15) +
-  (Heals × 40) +
-  (Revives × 25) +
-  (Defibs × 30) +
-  (Finales Won × 1000) +
-  (Molotovs × 5) +
-  (Pipe Bombs × 5) +
-  (Bile Bombs × 5) +
-  (Pills × 10) +
-  (Adrenaline × 15) +
-  (Damage Taken Bonus × 0.5) +
-  (Teammate Kills × -100) +
-  (Friendly Fire Damage × -2)
-```
+## Tie-Breaking Criteria
 
-## Implementation Details
+When MVP points are equal, the system uses these criteria in order:
 
-### Sessions Page
-- Displays aggregated user statistics from the `stats_users` table
-- Calculates MVP points for each player using real database values
-- Orders players by MVP points (highest first)
-- Marks the top player as MVP with visual indicators
+1. **Special Infected Kills** (highest wins)
+2. **Friendly Fire Count** (lowest wins)
+3. **Common Infected Kills** (highest wins)
+4. **Damage Taken** (lowest wins)
+5. **Friendly Fire Damage** (lowest wins)
 
-### Campaign Details
-- Uses the traditional ranking system for individual campaign MVP
-- Orders by: Special Kills (desc) → FF Count (asc) → Zombie Kills (desc) → Damage Taken (asc) → FF Damage (asc)
+## Configuration Location
 
-### Configuration
-- Point values are stored in `/website-api/config/point-calculation-rules.json`
-- System is configurable and can be adjusted without code changes
-- Rules are loaded dynamically by the API
+**File**: `website-api/config/point-system.json`
+**Section**: `mvp_calculation.point_values`
+
+### To Modify MVP Rules:
+1. Edit the configuration file
+2. Restart the API service
+3. Run recalculation if needed
 
 ## Design Philosophy
 
 The MVP system is designed to:
 1. **Reward Skill**: Higher points for challenging actions (special kills, tank kills)
 2. **Encourage Teamwork**: Significant points for healing, reviving, and supporting teammates
-3. **Promote Efficiency**: Bonus for taking less damage than average
-4. **Discourage Griefing**: Heavy penalties for team kills and friendly fire
-5. **Value Contribution**: Points for tactical item usage and campaign completion
+3. **Focus on Positive Play**: Lighter penalties compared to ranking system
+4. **Recognize Contribution**: Points for tactical item usage and campaign completion
+5. **Maintain Balance**: Configurable penalties prevent exploitation
 
-## Update History
+## Key Differences from Ranking System
 
-- **v1.0**: Initial MVP system with basic combat metrics
-- **v1.1**: Added teamwork actions (heals, revives, defibs)
-- **v1.2**: Added item usage tracking and damage taken bonus
-- **v1.3**: Updated friendly fire penalty to -2 per damage point
-- **v1.4**: Added comprehensive positive actions for throwables and consumables
+| Aspect | MVP System | Ranking System |
+|--------|------------|----------------|
+| **Purpose** | Recognize exceptional performance | Long-term competitive ranking |
+| **FF Penalty** | Lighter (current: -3 multiplier) | Harsh (current: -40 per damage) |
+| **Focus** | Positive contributions | Balanced discipline + skill |
+| **Philosophy** | Skill recognition | Team-first mentality |
 
-Last Updated: 2025-07-14
+## Configuration Flexibility
+
+All MVP rules are fully configurable in `point-system.json`:
+- **Point values** can be adjusted for any action
+- **Penalties** can be modified to match server philosophy
+- **Rules** can be enabled/disabled as needed
+- **Tie-breaking criteria** can be reordered
+
+---
+
+**Last Updated**: 2025-01-16
+**Status**: Configuration-driven system, all values adjustable

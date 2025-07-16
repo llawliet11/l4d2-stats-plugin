@@ -19,7 +19,7 @@
       "special_infected_kills": {
         "points_per_kill": 6,
         "description": "Points per special infected kill",
-        "source_field": "special_infected_kills"
+        "source_field": "kills_all_specials"
       },
       "witch_kills": {
         "points_per_kill": 15,
@@ -34,13 +34,16 @@
       "tank_damage": {
         "points_per_damage": 0.1,
         "description": "Points per damage dealt to tank",
-        "source_field": "damage_to_tank"
+        "source_field": "damage_to_tank",
+        "enabled": false,
+        "note": "Disabled in favor of tank_kill_max calculation"
       },
       "tank_kill_max": {
         "points": 100,
         "description": "Maximum points for tank kill contribution",
         "calculation": "damage_percent * 100",
         "tank_hp_estimate": 6000,
+        "source_field": "damage_to_tank",
         "enabled": true
       },
       "tank_kill_solo": {
@@ -75,7 +78,7 @@
         "description": "Points for saving teammates from special infected",
         "calculation": "special_kills * save_ratio",
         "save_ratio": 0.3,
-        "source_field": "special_infected_kills",
+        "source_field": "kills_all_specials",
         "enabled": true
       },
       "ammo_pack_deploy": {
