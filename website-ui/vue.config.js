@@ -3,7 +3,7 @@ module.exports = {
     devServer: {
         proxy: {
             '^/api': {
-                target: 'http://l4d2stats-api.l4d2-stats-plugin.orb.local'
+                target: 'http://l4d2stats-api:8081'
             }
         }
     },
