@@ -49,11 +49,9 @@
                             <div class="buttons">
                                 <b-button
                                     type="is-primary"
-                                    size="is-small"
                                     @click="reloadPointSystem"
                                     :loading="reloading">
-                                    <b-icon icon="refresh"></b-icon>
-                                    <span>Recalculate/Reload Rules</span>
+                                    <span>Reload Rules</span>
                                 </b-button>
                             </div>
                         </div>
