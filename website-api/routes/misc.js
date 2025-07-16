@@ -3,8 +3,72 @@ const router = Router()
 import routeCache from 'route-cache'
 import fs from 'fs'
 import path from 'path'
+import PointCalculator from '../services/PointCalculator.js'
 
 export default function(pool) {
+    // Point system configuration endpoint
+    router.get('/point-system', routeCache.cacheSeconds(300), async(req, res) => {
+        try {
+            const pointCalculator = new PointCalculator();
+            const config = pointCalculator.getConfig();
+
+            res.json({
+                success: true,
+                config: config,
+                version: config.version,
+                last_updated: config.last_updated
+            });
+        } catch (error) {
+            console.error('[/api/point-system] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to load point system configuration',
+                error: error.message
+            });
+        }
+    });
+
+    // Point calculation breakdown for a specific session
+    router.get('/point-breakdown/:sessionId', async(req, res) => {
+        try {
+            const sessionId = req.params.sessionId;
+
+            // Get session data
+            const [sessions] = await pool.execute(
+                'SELECT * FROM stats_games WHERE id = ?',
+                [sessionId]
+            );
+
+            if (sessions.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Session not found'
+                });
+            }
+
+            const session = sessions[0];
+            const pointCalculator = new PointCalculator();
+            const breakdown = pointCalculator.calculateSessionPoints(session);
+            const warnings = pointCalculator.validateSessionData(session);
+
+            res.json({
+                success: true,
+                session_id: sessionId,
+                steamid: session.steamid,
+                breakdown: breakdown,
+                warnings: warnings,
+                session_data: session
+            });
+        } catch (error) {
+            console.error('[/api/point-breakdown] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to calculate point breakdown',
+                error: error.message
+            });
+        }
+    });
+
     router.get('/info', routeCache.cacheSeconds(120), async(req,res) => {
         try {
             const [totals] = await pool.execute("SELECT (SELECT COUNT(*) FROM `stats_users`) AS total_users, (SELECT COUNT(*) FROM `stats_games`) AS total_sessions");
@@ -192,16 +256,45 @@ export default function(pool) {
         }
     })
 
-    // Get point calculation rules from JSON config
+    // Legacy endpoint - redirect to new point-system endpoint
     router.get('/point-rules', routeCache.cacheSeconds(300), async(req,res) => {
         try {
-            const rulesPath = path.join(process.cwd(), 'config', 'point-calculation-rules.json');
-            const rulesData = fs.readFileSync(rulesPath, 'utf8');
-            const pointRules = JSON.parse(rulesData);
-            
+            const pointCalculator = new PointCalculator();
+            const config = pointCalculator.getConfig();
+
+            // Convert new format to legacy format for backward compatibility
+            const legacyFormat = {
+                point_values: {
+                    positive_actions: {},
+                    penalties: {}
+                },
+                calculation_rules: config.calculation_settings
+            };
+
+            // Convert base points to legacy format
+            for (const [key, rule] of Object.entries(config.base_points.rules)) {
+                if (rule.enabled !== false) {
+                    const multiplier = rule.points_per_kill || rule.points_per_headshot ||
+                                     rule.points_per_damage || rule.points_per_heal ||
+                                     rule.points_per_revive || rule.points_per_defib ||
+                                     rule.points_per_crown || rule.points_per_save ||
+                                     rule.points_per_pack || rule.points || 1;
+                    legacyFormat.point_values.positive_actions[key] = multiplier;
+                }
+            }
+
+            // Convert penalties to legacy format
+            for (const [key, rule] of Object.entries(config.penalties.rules)) {
+                if (rule.enabled !== false) {
+                    const multiplier = rule.points_per_damage || rule.points_per_kill || rule.points_per_death || 0;
+                    legacyFormat.point_values.penalties[key] = multiplier;
+                }
+            }
+
             res.json({
                 success: true,
-                rules: pointRules
+                rules: legacyFormat,
+                note: "This endpoint is deprecated. Use /api/point-system for the new format."
             });
         } catch(err) {
             console.error('[/api/point-rules]', err.message);
@@ -218,26 +311,9 @@ export default function(pool) {
         try {
             console.log('[/api/recalculate] Starting point recalculation...');
             
-            // Load point calculation rules
-            let pointRules;
-            try {
-                const rulesPath = path.join(process.cwd(), 'config', 'point-calculation-rules.json');
-                const rulesData = fs.readFileSync(rulesPath, 'utf8');
-                pointRules = JSON.parse(rulesData);
-                console.log('[/api/recalculate] Loaded point calculation rules');
-            } catch (err) {
-                console.warn('[/api/recalculate] Could not load point rules, using defaults:', err.message);
-                pointRules = {
-                    point_values: {
-                        positive_actions: {
-                            common_kill: 1, special_kill: 6, witch_kill: 15,
-                            heal_teammate: 40, revive_teammate: 25, defib_teammate: 50,
-                            teammate_save: 20, finale_win: 1000
-                        },
-                        penalties: { friendly_fire_per_damage: -40 }
-                    }
-                };
-            }
+            // Initialize point calculator with new system
+            const pointCalculator = new PointCalculator();
+            console.log('[/api/recalculate] Loaded point system configuration');
             
             // Clear existing points
             await pool.execute("DELETE FROM stats_points");
@@ -267,53 +343,21 @@ export default function(pool) {
             let processedCount = 0;
             let totalPointsCalculated = 0;
             const batchSize = 100;
-            
+
             for (let i = 0; i < sessions.length; i += batchSize) {
                 const batch = sessions.slice(i, i + batchSize);
-                
+
                 for (const session of batch) {
-                    // Calculate points for this session using configuration
-                    let points = 0;
-                    const pv = pointRules.point_values;
-                    
-                    // Common infected kills
-                    points += (session.ZombieKills || 0) * (pv.positive_actions.common_kill || 1);
-                    
-                    // Special infected kills
-                    points += (session.SpecialInfectedKills || 0) * (pv.positive_actions.special_kill || 6);
-                    
-                    // Tank damage (approximate tank kill points)
-                    if (session.DamageToTank && session.DamageToTank > 0) {
-                        const tankHp = 6000; // Standard tank HP
-                        const damagePercent = Math.min(1.0, session.DamageToTank / tankHp);
-                        points += Math.floor(damagePercent * (pv.positive_actions.tank_kill_max || 100));
+                    // Calculate points using new point system
+                    const pointBreakdown = pointCalculator.calculateSessionPoints(session);
+                    let points = pointBreakdown.total;
+
+                    // Validate session data
+                    const warnings = pointCalculator.validateSessionData(session);
+                    if (warnings.length > 0) {
+                        console.warn(`Session ${session.id} validation warnings:`, warnings);
                     }
-                    
-                    // Witch kills
-                    points += (session.WitchesCrowned || 0) * (pv.positive_actions.witch_kill || 15);
-                    
-                    // Heal teammates (using FirstAidShared as proxy)
-                    points += (session.FirstAidShared || 0) * (pv.positive_actions.heal_teammate || 40);
-                    
-                    // Revive teammates
-                    points += (session.ReviveOtherCount || 0) * (pv.positive_actions.revive_teammate || 25);
-                    
-                    // Defib teammates
-                    points += (session.DefibrillatorsUsed || 0) * (pv.positive_actions.defib_teammate || 50);
-                    
-                    // Teammate saves (estimated from special kills)
-                    const saveRatio = 0.3; // 30% of special kills are saves
-                    points += Math.floor((session.SpecialInfectedKills || 0) * saveRatio) * (pv.positive_actions.teammate_save || 20);
-                    
-                    // Finale wins
-                    if (session.finale_time && session.finale_time > 0) {
-                        points += (pv.positive_actions.finale_win || 1000);
-                    }
-                    
-                    // Penalties - Friendly fire damage (limit to prevent overflow)
-                    const ffDamage = Math.min(10000, session.SurvivorDamage || 0); // Cap at 10k damage
-                    points += ffDamage * (pv.penalties.friendly_fire_per_damage || -40);
-                    
+
                     // Limit points range to prevent database overflow
                     points = Math.max(-50000, Math.min(50000, points));
                     

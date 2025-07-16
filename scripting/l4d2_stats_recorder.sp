@@ -1781,14 +1781,15 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 			players[attacker].damageInfectedGiven += dmg;
 		}
 		if(attacker_team == 2 && victim_team == 2) {
-			// Flat friendly fire penalty: -40 per damage dealt to teammate
-			int penalty = dmg * -40;
-			
-			players[attacker].RecordPoint(PType_FriendlyFire, penalty);
+			// Record raw friendly fire damage - penalty calculation handled by API
 			players[attacker].damageSurvivorFF += dmg;
 			players[attacker].damageSurvivorFFCount++;
 			players[victim].damageFFTaken += dmg;
 			players[victim].damageFFTakenCount++;
+
+			// Update map-specific stats with raw damage
+			IncrementMapStat(attacker, "survivor_ff", dmg);
+			IncrementMapStat(victim, "survivor_ff_rec", dmg);
 		}
 	}
 	
@@ -1837,9 +1838,8 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 				}
 				IncrementBothStats(victim, "infected_deaths", 1);
 			} else if(victim_team == 2) {
+				// Record raw teammate kill stat - penalty calculation handled by API
 				IncrementBothStats(attacker, "ff_kills", 1);
-				//30 point lost for killing teammate
-				players[attacker].RecordPoint(PType_FriendlyFire, -500);
 			}
 		}
 	}

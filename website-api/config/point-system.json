@@ -1,0 +1,250 @@
+{
+  "version": "2.0",
+  "description": "Comprehensive point calculation system for L4D2 Stats",
+  "last_updated": "2024-07-16",
+  
+  "base_points": {
+    "description": "Base points for positive actions",
+    "rules": {
+      "common_kills": {
+        "points_per_kill": 1,
+        "description": "Points per common infected kill",
+        "source_field": "ZombieKills"
+      },
+      "common_headshots": {
+        "points_per_headshot": 2,
+        "description": "Bonus points for headshot kills",
+        "source_field": "common_headshots"
+      },
+      "special_infected_kills": {
+        "points_per_kill": 6,
+        "description": "Points per special infected kill",
+        "source_field": "SpecialInfectedKills"
+      },
+      "witch_kills": {
+        "points_per_kill": 15,
+        "description": "Points for killing witch",
+        "source_field": "kills_witch"
+      },
+      "witch_crowns": {
+        "points_per_crown": 25,
+        "description": "Bonus points for crowning witch",
+        "source_field": "WitchesCrowned"
+      },
+      "tank_damage": {
+        "points_per_damage": 0.1,
+        "description": "Points per damage dealt to tank",
+        "source_field": "DamageToTank"
+      },
+      "tank_kill_max": {
+        "points": 100,
+        "description": "Maximum points for tank kill contribution",
+        "calculation": "damage_percent * 100",
+        "tank_hp_estimate": 6000,
+        "enabled": true
+      },
+      "tank_kill_solo": {
+        "points": 20,
+        "description": "Bonus for solo tank kill",
+        "enabled": false,
+        "note": "Not tracked in current system"
+      },
+      "tank_kill_melee": {
+        "points": 50,
+        "description": "Bonus for melee tank kill",
+        "enabled": false,
+        "note": "Not tracked in current system"
+      },
+      "first_aid_shared": {
+        "points_per_heal": 40,
+        "description": "Points for healing teammates",
+        "source_field": "FirstAidShared"
+      },
+      "revive_others": {
+        "points_per_revive": 25,
+        "description": "Points for reviving teammates",
+        "source_field": "ReviveOtherCount"
+      },
+      "defibrillator_used": {
+        "points_per_defib": 30,
+        "description": "Points for using defibrillator",
+        "source_field": "DefibrillatorsUsed"
+      },
+      "teammate_save": {
+        "points_per_save": 10,
+        "description": "Points for saving teammates from special infected",
+        "calculation": "special_kills * save_ratio",
+        "save_ratio": 0.3,
+        "source_field": "SpecialInfectedKills",
+        "enabled": true
+      },
+      "ammo_pack_deploy": {
+        "points_per_pack": 20,
+        "description": "Points for deploying ammo packs",
+        "source_field": "packs_used",
+        "enabled": true
+      },
+      "finale_completion": {
+        "points_per_finale": 1000,
+        "description": "Bonus points for completing finale",
+        "condition": "finale_time > 0"
+      },
+      "melee_kills": {
+        "points_per_kill": 2,
+        "description": "Points per melee kill",
+        "source_field": "melee_kills"
+      },
+      "molotov_damage": {
+        "points_per_damage": 0.05,
+        "description": "Points per molotov damage",
+        "source_field": "damage_molotov"
+      },
+      "pipe_bomb_kills": {
+        "points_per_kill": 3,
+        "description": "Points per pipe bomb kill",
+        "source_field": "kills_pipe"
+      },
+      "heal_teammate_critical": {
+        "points_per_heal": 60,
+        "description": "Bonus points for critical heals",
+        "calculation": "heals * critical_ratio",
+        "critical_ratio": 0.2,
+        "source_field": "FirstAidShared",
+        "enabled": false,
+        "note": "Critical heals not tracked separately"
+      },
+      "molotov_use": {
+        "points_per_use": 5,
+        "description": "Points for using molotov",
+        "enabled": false,
+        "note": "Usage not tracked, only damage/kills"
+      },
+      "pipe_use": {
+        "points_per_use": 5,
+        "description": "Points for using pipe bomb",
+        "enabled": false,
+        "note": "Usage not tracked, only kills"
+      },
+      "bile_use": {
+        "points_per_use": 5,
+        "description": "Points for using bile bomb",
+        "enabled": false,
+        "note": "Not tracked in current system"
+      },
+      "pill_use": {
+        "points_per_use": 10,
+        "description": "Points for using pills",
+        "enabled": false,
+        "note": "Not tracked in current system"
+      },
+      "adrenaline_use": {
+        "points_per_use": 15,
+        "description": "Points for using adrenaline",
+        "enabled": false,
+        "note": "Not tracked in current system"
+      }
+    }
+  },
+
+  "penalties": {
+    "description": "Point penalties for negative actions",
+    "rules": {
+      "friendly_fire_damage": {
+        "points_per_damage": -40,
+        "description": "Penalty per HP damage dealt to teammates",
+        "source_field": "SurvivorFFDamage",
+        "max_penalty": -10000,
+        "note": "Capped to prevent extreme penalties"
+      },
+      "teammate_kills": {
+        "points_per_kill": -500,
+        "description": "Heavy penalty for killing teammates",
+        "source_field": "ff_kills"
+      },
+      "deaths": {
+        "points_per_death": -50,
+        "description": "Penalty for dying",
+        "source_field": "Deaths",
+        "enabled": false,
+        "note": "Currently disabled - deaths are tracked but not penalized"
+      }
+    }
+  },
+
+  "multipliers": {
+    "description": "Situational multipliers for point calculation",
+    "rules": {
+      "difficulty_bonus": {
+        "easy": 0.8,
+        "normal": 1.0,
+        "hard": 1.2,
+        "expert": 1.5,
+        "description": "Multiplier based on game difficulty",
+        "enabled": false,
+        "note": "Not implemented - difficulty not tracked"
+      },
+      "team_size_bonus": {
+        "solo": 1.5,
+        "duo": 1.2,
+        "trio": 1.1,
+        "full_team": 1.0,
+        "description": "Bonus for playing with fewer teammates",
+        "enabled": false,
+        "note": "Not implemented - team size not consistently tracked"
+      }
+    }
+  },
+
+  "special_bonuses": {
+    "description": "Special achievement bonuses",
+    "rules": {
+      "perfect_round": {
+        "points": 500,
+        "description": "Bonus for completing round without taking damage",
+        "condition": "survivor_damage_rec == 0 && finale_time > 0",
+        "enabled": false,
+        "note": "Experimental feature"
+      },
+      "no_friendly_fire": {
+        "points": 100,
+        "description": "Bonus for completing round without friendly fire",
+        "condition": "survivor_ff == 0 && finale_time > 0",
+        "enabled": false,
+        "note": "Experimental feature"
+      }
+    }
+  },
+
+  "calculation_settings": {
+    "description": "General calculation settings",
+    "round_final_score": true,
+    "minimum_points": null,
+    "maximum_points": null,
+    "decimal_places": 0,
+    "calculation_order": [
+      "base_points",
+      "penalties",
+      "multipliers",
+      "special_bonuses"
+    ],
+    "session_requirements": {
+      "minimum_duration": 60,
+      "require_valid_timestamps": true
+    },
+    "limits": {
+      "minimum_session_points": -50000,
+      "maximum_session_points": 50000
+    }
+  },
+
+  "validation": {
+    "description": "Data validation rules",
+    "max_reasonable_values": {
+      "common_kills": 5000,
+      "special_infected_kills": 1000,
+      "survivor_ff": 2000,
+      "damage_to_tank": 50000,
+      "description": "Maximum reasonable values to detect data corruption"
+    }
+  }
+}
