@@ -19,29 +19,29 @@
                 <div class="column">
                     <strong>Combat Actions:</strong>
                     <ul style="margin-left: 20px;">
-                        <li>Special Infected Kills × 6</li>
-                        <li>Common Kills × 1</li>
-                        <li>Tank Kills × 100</li>
-                        <li>Witch Kills × 15</li>
-                        <li>Finales Won × 1000</li>
+                        <li>Special Infected Kills × {{ mvpPositiveActions.special_kill || 6 }}</li>
+                        <li>Common Kills × {{ mvpPositiveActions.common_kill || 1 }}</li>
+                        <li>Tank Kills × {{ mvpPositiveActions.tank_kill_max || 100 }}</li>
+                        <li>Witch Kills × {{ mvpPositiveActions.witch_kill || 15 }}</li>
+                        <li>Finales Won × {{ mvpPositiveActions.finale_win || 1000 }}</li>
                     </ul>
                 </div>
                 <div class="column">
                     <strong>Teamwork & Items:</strong>
                     <ul style="margin-left: 20px;">
-                        <li>Heals × 40</li>
-                        <li>Revives × 25</li>
-                        <li>Defibs × 30</li>
-                        <li>Molotovs/Pipes/Bile × 5</li>
-                        <li>Pills × 10, Adrenaline × 15</li>
-                        <li>Damage Taken Bonus × 0.5</li>
+                        <li>Heals × {{ mvpPositiveActions.heal_teammate || 40 }}</li>
+                        <li>Revives × {{ mvpPositiveActions.revive_teammate || 25 }}</li>
+                        <li>Defibs × {{ mvpPositiveActions.defib_teammate || 30 }}</li>
+                        <li>Molotovs/Pipes/Bile × {{ mvpPositiveActions.molotov_use || 5 }}</li>
+                        <li>Pills × {{ mvpPositiveActions.pill_use || 10 }}, Adrenaline × {{ mvpPositiveActions.adrenaline_use || 15 }}</li>
+                        <li>Damage Taken Bonus × {{ mvpPointValues.bonuses?.damage_taken_bonus_multiplier || 0.5 }}</li>
                     </ul>
                 </div>
                 <div class="column">
                     <strong>Penalties:</strong>
                     <ul style="margin-left: 20px;">
-                        <li>Teammate Kills × -100</li>
-                        <li>Friendly Fire Damage × -2</li>
+                        <li>Teammate Kills × {{ mvpPenalties.teammate_kill || -100 }}</li>
+                        <li>Friendly Fire Damage × {{ mvpPenalties.ff_damage_multiplier || -2 }}</li>
                     </ul>
                 </div>
             </div>
@@ -72,9 +72,9 @@
                         <span v-if="props.row.isMVP" class="mvp-badge">MVP</span>
                     </router-link>
                 </b-table-column>
-                <b-table-column v-slot="props" field="map" label="Map">
+                <!-- <b-table-column v-slot="props" field="map" label="Map">
                     {{ getMapName(props.row.map) }}
-                </b-table-column>
+                </b-table-column> -->
                 <b-table-column v-slot="props" field="special_infected_kills" label="Special Kills" centered cell-class="number-cell">
                     {{ props.row.special_infected_kills | formatNumber }}
                 </b-table-column>
@@ -111,9 +111,9 @@
                 <b-table-column v-slot="props" field="survivor_deaths" label="Deaths" centered cell-class="number-cell">
                     {{ props.row.survivor_deaths | formatNumber }}
                 </b-table-column>
-                <b-table-column v-slot="props" field="difficulty" label="Difficulty" centered>
+                <!-- <b-table-column v-slot="props" field="difficulty" label="Difficulty" centered>
                     {{ (props.row.difficulty) }}
-                </b-table-column>
+                </b-table-column> -->
             <template #detail="props">
               <pre>{{props.row}}</pre>
             </template>
@@ -139,7 +139,8 @@ export default {
             sessions: [],
             loading: true,
             current_page: 1,
-            total_sessions: 0
+            total_sessions: 0,
+            pointSystem: null
         }
     },
     mounted() {
@@ -147,6 +148,7 @@ export default {
         if(isNaN(routerPage) || routerPage <= 0) routerPage = 1;
         this.current_page = routerPage;
         this.fetchSessions()
+        this.loadPointSystem()
         document.title = `Sessions - L4D2 Stats Plugin`
     },
     methods: {
@@ -193,6 +195,27 @@ export default {
         getRGB(campaignID) {
             if(!campaignID) return "#0f77ea"
             return "#" + dec2hex(campaignID.replace(/[^0-9]/g,'')).substring(0,6)
+        },
+        async loadPointSystem() {
+            try {
+                const response = await this.$http.get('/api/point-system')
+                if (response.data.success) {
+                    this.pointSystem = response.data.config
+                }
+            } catch (error) {
+                console.error('Failed to load point system:', error)
+            }
+        }
+    },
+    computed: {
+        mvpPointValues() {
+            return this.pointSystem?.mvp_calculation?.point_values || {}
+        },
+        mvpPositiveActions() {
+            return this.mvpPointValues?.positive_actions || {}
+        },
+        mvpPenalties() {
+            return this.mvpPointValues?.penalties || {}
         }
     }
 }
