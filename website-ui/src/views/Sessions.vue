@@ -343,6 +343,7 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
     border-top: 1px solid #f5f5f5;
     display: flex;
     justify-content: center;
+    margin-right: 15px;
 }
 
 .beautiful-table .pagination {
