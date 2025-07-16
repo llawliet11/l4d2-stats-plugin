@@ -36,8 +36,7 @@
                 type="is-warning"
                 size="is-small"
                 @click="recalculatePoints"
-                :loading="recalculating"
-                icon-left="refresh"
+                :loading="recalculating"          
               >
                 Recalculate
               </b-button>
@@ -255,5 +254,44 @@ html, body {
 .pagination-link:focus {
   background-color: #1366d6 !important;
   border-color: #1366d6 !important;
+}
+
+/* Global table header styling */
+.table thead th {
+  background-color: #167df0 !important;
+  color: white !important;
+  border: none !important;
+  padding: 15px 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  font-size: 0.85rem !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* Beautiful table styling */
+.beautiful-table .table thead th {
+  background-color: #167df0 !important;
+  color: white !important;
+  border: none !important;
+  padding: 15px 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  font-size: 0.85rem !important;
+  letter-spacing: 0.5px !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+}
+
+/* Buefy table header styling */
+.b-table .table thead th {
+  background-color: #167df0 !important;
+  color: white !important;
+  border: none !important;
+  padding: 15px 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  font-size: 0.85rem !important;
+  letter-spacing: 0.5px !important;
 }
 </style>

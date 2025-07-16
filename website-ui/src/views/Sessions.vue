@@ -238,10 +238,6 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 <style>
 /* Beautiful Scrollable Table Styles */
 .table-container {
-    background: #167df0;
-    border-radius: 4px;
-    padding: 5px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     margin: 10px 0;
 }
 
@@ -249,12 +245,13 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
     background: white;
     border-radius: 4px;
     overflow: auto;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     max-height: 80vh;
     position: relative;
     /* Enable both horizontal and vertical scrolling */
     overflow-x: auto;
     overflow-y: auto;
+    border: 1px solid #e0e0e0;
 }
 
 /* Horizontal scrollbar */
@@ -295,7 +292,7 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 }
 
 .beautiful-table .table thead th {
-    background: #1366d6;
+    background: #167df0;
     color: white;
     border: none;
     padding: 15px 10px;
@@ -314,9 +311,7 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 }
 
 .beautiful-table .table tbody tr:hover {
-    background: rgba(22, 125, 240, 0.08);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    background: rgba(22, 125, 240, 0.05);
 }
 
 .beautiful-table .table tbody tr:nth-child(even) {
@@ -324,7 +319,7 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 }
 
 .beautiful-table .table tbody tr:nth-child(even):hover {
-    background: rgba(22, 125, 240, 0.12);
+    background: rgba(22, 125, 240, 0.08);
 }
 
 .beautiful-table .table td {
@@ -425,8 +420,6 @@ function dec2hex(str){ // .toString(16) only works up to 2^53
 
 .beautiful-table .button.is-info:hover {
     background: #1366d6;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(22, 125, 240, 0.3);
 }
 
 /* Scroll indicators */
