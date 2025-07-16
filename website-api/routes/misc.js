@@ -32,9 +32,13 @@ export default function(pool) {
 
     router.get('/totals', routeCache.cacheSeconds(300), async(req,res) => {
         try {
+            // Get longest individual player playtime (Total Playtime = longest play time of any single player)
+            const [longestPlaytime] = await pool.execute(`SELECT
+            max(nullif(minutes_played,0)) * 60 as longest_playtime
+            FROM stats_users`)
+
             // Get aggregated stats from stats_users table for more accurate totals
             const [totals] = await pool.execute(`SELECT
-            sum(nullif(minutes_played,0)) * 60 as game_duration,
             sum(nullif(common_kills,0)) as zombie_kills,
             sum(nullif(survivor_ff,0)) as survivor_ff,
             sum(nullif(heal_others,0)) as MedkitsUsed,
@@ -60,13 +64,19 @@ export default function(pool) {
             (SELECT COUNT(distinct(campaignID)) from stats_games) AS total_games,
             (SELECT COUNT(*) FROM \`stats_users\`) AS total_users
             FROM stats_users`)
+
+            // Combine longest playtime with other stats
+            const combinedStats = {
+                ...totals[0],
+                game_duration: longestPlaytime[0]?.longest_playtime || 0
+            }
             const [mapTotals] = await pool.execute("SELECT map,COUNT(*) as count FROM stats_games GROUP BY map ORDER BY COUNT(map) DESC")
             if(totals.length == 0) {
                 return res.status(500).json({error:'Internal Server Error'})
             }else{
                 let stats = {}, maps = {};
-                for(const key in totals[0]) {
-                    stats[key] = parseInt(totals[0][key])
+                for(const key in combinedStats) {
+                    stats[key] = parseInt(combinedStats[key])
                 }
                 mapTotals.forEach(({map,count}) => {
                     maps[map] = count;
@@ -85,9 +95,19 @@ export default function(pool) {
         try {
             const [maps] = await pool.execute("SELECT map FROM stats_games WHERE map RLIKE \"^c[0-9]m\" GROUP BY map ORDER BY COUNT(map) DESC")
             const [userCount] = await pool.execute("SELECT AVG(games.players) as avgPlayers FROM (SELECT COUNT(campaignID) as players FROM stats_games GROUP BY `campaignID`) as games")
+
+            // Get average session duration from stats_games (actual campaign session times)
+            const [avgSessionDuration] = await pool.execute(`SELECT
+            avg(CASE WHEN date_end > 0 AND date_start > 0 THEN date_end - date_start ELSE 0 END) as avg_session_duration
+            FROM (
+                SELECT campaignID, MAX(date_end) as date_end, MIN(date_start) as date_start
+                FROM stats_games
+                WHERE date_end > 0 AND date_start > 0
+                GROUP BY campaignID
+            ) as sessions`)
+
             // Get average stats from stats_users table for more accurate averages
             const [topStats] = await pool.execute(`SELECT
-            avg(nullif(minutes_played,0)) * 60 as game_duration,
             avg(nullif(common_kills,0)) as zombie_kills,
             avg(nullif(survivor_ff,0)) as survivor_ff,
             avg(nullif(heal_others,0)) as MedkitsUsed,
@@ -121,6 +141,8 @@ export default function(pool) {
                         stats[key] = parseFloat(topStats[0][key])
                     }
                 }
+                // Add the correct session duration
+                stats.game_duration = avgSessionDuration[0]?.avg_session_duration || 0;
             }
             res.json({
                 topMap: maps.length > 0 ? maps[0].map : null,
