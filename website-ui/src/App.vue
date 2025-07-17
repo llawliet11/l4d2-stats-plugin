@@ -204,6 +204,7 @@ html, body {
 .navbar-start .navbar-item,
 .navbar-end .navbar-item {
   color: white !important;
+  transition: all 0.2s ease;
 }
 
 .navbar-brand .navbar-item:hover,
@@ -211,6 +212,33 @@ html, body {
 .navbar-end .navbar-item:hover {
   background-color: #1366d6 !important;
   color: white !important;
+}
+
+/* Fix focus state - remove white background on click */
+.navbar-brand .navbar-item:focus,
+.navbar-start .navbar-item:focus,
+.navbar-end .navbar-item:focus {
+  background-color: #1366d6 !important;
+  color: white !important;
+  outline: none !important;
+}
+
+/* Active state for current route */
+.navbar-brand .navbar-item.is-active,
+.navbar-start .navbar-item.is-active,
+.navbar-end .navbar-item.is-active {
+  background-color: #0f5bb8 !important;
+  color: white !important;
+  font-weight: 600 !important;
+}
+
+/* Exact active state for current route */
+.navbar-brand .navbar-item.router-link-exact-active,
+.navbar-start .navbar-item.router-link-exact-active,
+.navbar-end .navbar-item.router-link-exact-active {
+  background-color: #0f5bb8 !important;
+  color: white !important;
+  font-weight: 600 !important;
 }
 
 .navbar-brand .title {
@@ -226,6 +254,22 @@ html, body {
 .navbar .button.is-info:hover {
   background-color: #0f5bb8;
   border-color: #0f5bb8;
+}
+
+/* Override Buefy navbar item default focus/active states */
+.navbar-item:focus,
+.navbar-item:focus-within,
+.navbar-item:active {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+/* Ensure navbar items in navbar context override Buefy defaults */
+.navbar .navbar-item:focus,
+.navbar .navbar-item:focus-within,
+.navbar .navbar-item:active {
+  background-color: #1366d6 !important;
+  color: white !important;
 }
 
 #nav {
