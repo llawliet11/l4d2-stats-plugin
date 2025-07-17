@@ -3,6 +3,7 @@ const router = Router()
 import routeCache from 'route-cache'
 import fs from 'fs'
 import path from 'path'
+import PointCalculator from '../services/PointCalculator.js'
 
 import Canvas from 'canvas'
 
@@ -186,6 +187,94 @@ export default function(pool) {
         }catch(err) {
             console.error('/api/user/:user/sessions/:page',err.message)
             res.status(500).json({error:'Internal Server Error'})
+        }
+    })
+
+    // Calculate overall user points based on stats_users data
+    router.get('/:user/points/calculate', routeCache.cacheSeconds(120), async (req, res) => {
+        try {
+            const steamid = req.params.user;
+
+            // Get user data from stats_users table
+            const [users] = await pool.execute(
+                'SELECT * FROM stats_users WHERE steamid = ?',
+                [steamid]
+            );
+
+            if (users.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            const userData = users[0];
+            const pointCalculator = new PointCalculator();
+            const breakdown = pointCalculator.calculateUserPoints(userData);
+
+            res.json({
+                success: true,
+                steamid: userData.steamid,
+                calculation_type: 'user_overall',
+                breakdown: breakdown,
+                user_data: {
+                    steamid: userData.steamid,
+                    last_alias: userData.last_alias,
+                    points: userData.points,
+                    minutes_played: userData.minutes_played
+                }
+            });
+        } catch (error) {
+            console.error('[/api/user/:user/points/calculate] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to calculate user points',
+                error: error.message
+            });
+        }
+    })
+
+    // Calculate MVP points for overall user statistics
+    router.get('/:user/mvp/calculate', routeCache.cacheSeconds(120), async (req, res) => {
+        try {
+            const steamid = req.params.user;
+
+            // Get user data from stats_users table
+            const [users] = await pool.execute(
+                'SELECT * FROM stats_users WHERE steamid = ?',
+                [steamid]
+            );
+
+            if (users.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            const userData = users[0];
+            const pointCalculator = new PointCalculator();
+            const breakdown = pointCalculator.calculateMVPPoints(userData, 'overall');
+
+            res.json({
+                success: true,
+                steamid: userData.steamid,
+                calculation_type: 'mvp_overall',
+                breakdown: breakdown,
+                user_data: {
+                    steamid: userData.steamid,
+                    last_alias: userData.last_alias,
+                    points: userData.points,
+                    minutes_played: userData.minutes_played
+                }
+            });
+        } catch (error) {
+            console.error('[/api/user/:user/mvp/calculate] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to calculate MVP points',
+                error: error.message
+            });
         }
     })
     router.get('/:user/sessions/:page', async (req, res) => {
