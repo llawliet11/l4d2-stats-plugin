@@ -12,4 +12,4 @@ databases.cfg
 backups/
 
 # ignore apple 
-.DS_Store
+*.DS_Store
