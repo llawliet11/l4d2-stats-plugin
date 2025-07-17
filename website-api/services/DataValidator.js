@@ -8,7 +8,7 @@ class DataValidator {
     constructor() {
         this.statisticalFields = [
             'common_kills',
-            'kills_all_specials',
+            // 'kills_all_specials', // Removed - calculated on-the-fly
             'survivor_ff',
             'survivor_ff_rec',
             'heal_others',

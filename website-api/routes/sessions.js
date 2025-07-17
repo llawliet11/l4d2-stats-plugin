@@ -4,6 +4,7 @@ import routeCache from 'route-cache'
 import fs from 'fs'
 import path from 'path'
 import MVPCalculator from '../services/MVPCalculator.js'
+import { addSpecialInfectedKills } from '../utils/dataHelpers.js'
 
 export default function(pool) {
     router.get('/', routeCache.cacheSeconds(120), async(req,res) => {

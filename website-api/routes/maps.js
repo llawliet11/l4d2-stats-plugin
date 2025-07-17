@@ -2,6 +2,7 @@ import Router from 'express'
 const router = Router()
 import routeCache from 'route-cache'
 import PointCalculator from '../services/PointCalculator.js'
+import { addKillsAllSpecials } from '../utils/dataHelpers.js'
 
 export default function(pool) {
     router.get('/', routeCache.cacheSeconds(120), async (req, res) => {
@@ -108,7 +109,7 @@ export default function(pool) {
                 });
             }
 
-            const userData = mapUserData[0];
+            const userData = addKillsAllSpecials(mapUserData[0]);
             const pointCalculator = new PointCalculator();
             const breakdown = pointCalculator.calculateMapPoints(userData);
 
@@ -179,7 +180,7 @@ export default function(pool) {
                 });
             }
 
-            const userData = mapUserData[0];
+            const userData = addKillsAllSpecials(mapUserData[0]);
             const pointCalculator = new PointCalculator();
             const breakdown = pointCalculator.calculateMVPPoints(userData, 'map');
 

@@ -4,6 +4,7 @@ import routeCache from 'route-cache'
 import fs from 'fs'
 import path from 'path'
 import PointCalculator from '../services/PointCalculator.js'
+import { addKillsAllSpecials } from '../utils/dataHelpers.js'
 
 import Canvas from 'canvas'
 
@@ -39,7 +40,8 @@ export default function(pool) {
     router.get('/random', routeCache.cacheSeconds(calculationRules.cache_durations?.user_random || 86400), async(req,res) => {
         try {
             const [results] = await pool.execute("SELECT * FROM `stats_users` ORDER BY RAND() LIMIT 1")
-            return res.json({user: results[0]})
+            const userWithSpecials = addKillsAllSpecials(results[0])
+            return res.json({user: userWithSpecials})
         }catch(err) {
             res.status(500).json({error:"Internal Server Error"})
         }
@@ -55,8 +57,9 @@ export default function(pool) {
                 [user, bits]
             )
             if(rows.length > 0) {
+                const userWithSpecials = addKillsAllSpecials(rows[0])
                 res.json({
-                    user:rows[0],
+                    user: userWithSpecials,
                 })
             }else{
                 res.json({
@@ -208,7 +211,7 @@ export default function(pool) {
                 });
             }
 
-            const userData = users[0];
+            const userData = addKillsAllSpecials(users[0]);
             const pointCalculator = new PointCalculator();
             const breakdown = pointCalculator.calculateUserPoints(userData);
 

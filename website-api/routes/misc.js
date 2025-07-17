@@ -4,6 +4,7 @@ import routeCache from 'route-cache'
 import fs from 'fs'
 import path from 'path'
 import PointCalculator from '../services/PointCalculator.js'
+import { addKillsAllSpecials } from '../utils/dataHelpers.js'
 
 export default function(pool) {
     // Point system configuration endpoint
@@ -342,19 +343,9 @@ export default function(pool) {
             const pointCalculator = new PointCalculator();
             console.log('[/api/recalculate] Loaded point system configuration');
             
-            // Update kills_all_specials for all users before point calculation
-            await pool.execute(`
-                UPDATE stats_users 
-                SET kills_all_specials = kills_smoker + kills_boomer + kills_hunter + kills_spitter + kills_jockey + kills_charger
-            `);
-            console.log('[/api/recalculate] Updated kills_all_specials for all users');
-            
-            // Update kills_all_specials for all map users as well
-            await pool.execute(`
-                UPDATE stats_map_users 
-                SET kills_all_specials = kills_smoker + kills_boomer + kills_hunter + kills_spitter + kills_jockey + kills_charger
-            `);
-            console.log('[/api/recalculate] Updated kills_all_specials for all map users');
+            // Note: kills_all_specials column has been dropped from database
+            // It will be calculated on-the-fly in API responses
+            console.log('[/api/recalculate] Skipping kills_all_specials update (calculated on-the-fly)');
             
             // Get all users from stats_users table
             const [users] = await pool.execute(`
@@ -380,8 +371,11 @@ export default function(pool) {
                 const batch = users.slice(i, i + batchSize);
 
                 for (const user of batch) {
+                    // Add calculated kills_all_specials field before point calculation
+                    const userWithSpecials = addKillsAllSpecials(user);
+
                     // Calculate points using new point system based on user's cumulative stats
-                    const pointBreakdown = pointCalculator.calculateSessionPoints(user);
+                    const pointBreakdown = pointCalculator.calculateSessionPoints(userWithSpecials);
                     let points = pointBreakdown.total;
 
                     // Validate user data
@@ -433,8 +427,11 @@ export default function(pool) {
 
                 for (const mapUser of mapBatch) {
                     try {
+                        // Add calculated kills_all_specials field before point calculation
+                        const mapUserWithSpecials = addKillsAllSpecials(mapUser);
+
                         // Calculate map-specific points using PointCalculator
-                        const mapPointBreakdown = pointCalculator.calculateMapPoints(mapUser);
+                        const mapPointBreakdown = pointCalculator.calculateMapPoints(mapUserWithSpecials);
                         let mapPoints = mapPointBreakdown.total;
 
                         // Track total map points calculated
