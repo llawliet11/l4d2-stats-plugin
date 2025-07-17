@@ -413,15 +413,22 @@ For detailed technical information, refer to these documentation files:
 - **`docs/features/MVP_CALCULATION_RULES.md`**: MVP system rules and configuration
 - **`docs/features/PENALTY_SYSTEM_DESIGN.md`**: Dual penalty system design and rationale
 - **`docs/features/MAP_BASED_STATISTICS_ARCHITECTURE.md`**: Map-based database architecture
+- **`docs/features/API_POINTS_CALCULATION_ENDPOINTS.md`**: API endpoints for point calculations
 - **`docs/features/ENHANCEMENT_IMPROVEMENTS.md`**: Recent improvements and system monitoring
+
+### Development Documentation
+- **`docs/development/COMPILE_INSTRUCTIONS.md`**: SourceMod plugin compilation guide
+- **`docs/plan/DEVELOPMENT_ROADMAP_2025.md`**: Project development roadmap
 
 ### Setup Documentation
 - **`docs/setup/DOCKER-SETUP.md`**: Docker environment setup guide
 - **`README.md`**: Basic setup and Docker configuration
 
-### Troubleshooting
-- **`docs/troubleshooting/`**: Issues and fixes documentation
-- **`docs/reports/`**: Testing and debugging reports
+### Troubleshooting & Reports
+- **`docs/troubleshooting/POINT_CALCULATION_ISSUES.md`**: Point calculation problem analysis
+- **`docs/troubleshooting/HOMEPAGE_POINTS_FIX.md`**: Homepage points display fixes
+- **`docs/troubleshooting/PLAYTIME_AND_POINTS_FIX_REPORT.md`**: Playtime calculation fixes
+- **`docs/reports/testing_points_debug_20250715.md`**: Points debugging report
 
 ## System Status Summary
 

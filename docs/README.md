@@ -17,6 +17,7 @@ This directory contains comprehensive documentation for the Left 4 Dead 2 Statis
 - [MVP Calculation Rules](features/MVP_CALCULATION_RULES.md) - MVP determination system and rules
 - [Penalty System Design](features/PENALTY_SYSTEM_DESIGN.md) - Dual penalty system rationale
 - [Map-Based Statistics](features/MAP_BASED_STATISTICS_ARCHITECTURE.md) - Map-based statistics architecture
+- [API Points Calculation Endpoints](features/API_POINTS_CALCULATION_ENDPOINTS.md) - API endpoints for point calculations
 - [System Enhancements](features/ENHANCEMENT_IMPROVEMENTS.md) - Reliability and quality improvements
 
 ### 🔧 Troubleshooting
@@ -38,10 +39,10 @@ This directory contains comprehensive documentation for the Left 4 Dead 2 Statis
 | Category | Purpose | Key Files |
 |----------|---------|-----------|
 | **Setup** | Getting started | `setup/DOCKER-SETUP.md` |
-| **Development** | Building & coding | `development/COMPILE_INSTRUCTIONS.md` |
-| **Core Systems** | System architecture | `features/POINT_CALCULATION_SYSTEM.md` |
+| **Development** | Building & coding | `development/COMPILE_INSTRUCTIONS.md`, `plan/DEVELOPMENT_ROADMAP_2025.md` |
+| **Core Systems** | System architecture | `features/POINT_CALCULATION_SYSTEM.md`, `features/API_POINTS_CALCULATION_ENDPOINTS.md` |
 | **Troubleshooting** | Problem solving | `troubleshooting/POINT_CALCULATION_ISSUES.md` |
-| **Reports** | Analysis & debugging | `reports/` |
+| **Reports** | Analysis & debugging | `reports/testing_points_debug_20250715.md` |
 
 ## Key System Concepts
 
