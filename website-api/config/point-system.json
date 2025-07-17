@@ -59,7 +59,7 @@
         "enabled": true
       },
       "first_aid_shared": {
-        "points_per_heal": 40,
+        "points_per_heal": 25,
         "description": "Points for healing teammates",
         "source_field": "heal_others"
       },
@@ -89,7 +89,7 @@
         "note": "Field 'packs_used' not available in database schema"
       },
       "finale_completion": {
-        "points_per_finale": 1000,
+        "points_per_finale": 2000,
         "description": "Bonus points for completing finale",
         "source_field": "finales_won"
       },
@@ -188,7 +188,7 @@
     "description": "Point penalties for negative actions",
     "rules": {
       "friendly_fire_damage": {
-        "points_per_damage": -10,
+        "points_per_damage": -30,
         "description": "Penalty per HP damage dealt to teammates",
         "source_field": "survivor_ff"
       },
@@ -200,23 +200,23 @@
         "note": "Field 'ff_kills' not available in database schema"
       },
       "deaths": {
-        "points_per_death": -25,
+        "points_per_death": -10,
         "description": "Penalty for dying",
         "source_field": "survivor_deaths",
-        "enabled": false,
+        "enabled": true,
         "note": "Currently disabled - deaths are tracked but not penalized"
       },
       "car_alarms_triggered": {
         "points_per_alarm": -10,
         "description": "Penalty for triggering car alarms",
         "source_field": "caralarms_activated",
-        "enabled": true
+        "enabled": false
       },
       "times_pinned_penalty": {
         "points_per_pin": -5,
         "description": "Penalty for getting pinned by special infected",
         "source_field": "times_pinned",
-        "enabled": true
+        "enabled": false
       },
       "tank_rocks_hit": {
         "points_per_hit": -10,
@@ -234,7 +234,7 @@
         "points_per_minute": -2,
         "description": "Penalty for idle time",
         "source_field": "minutes_idle",
-        "enabled": true
+        "enabled": false
       },
       "boomer_bile_self": {
         "points_per_bile": -5,
@@ -329,7 +329,7 @@
       },
       "penalties": {
         "teammate_kill": -100,
-        "ff_damage_multiplier": -10
+        "ff_damage_multiplier": -30
       },
       "bonuses": {
         "damage_taken_bonus_multiplier": 0.5,
