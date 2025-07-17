@@ -196,15 +196,13 @@
         "points_per_kill": -500,
         "description": "Heavy penalty for killing teammates",
         "source_field": "ff_kills",
-        "enabled": false,
-        "note": "Field 'ff_kills' not available in database schema"
+        "enabled": true
       },
       "deaths": {
         "points_per_death": -10,
         "description": "Penalty for dying",
         "source_field": "survivor_deaths",
-        "enabled": true,
-        "note": "Currently disabled - deaths are tracked but not penalized"
+        "enabled": true
       },
       "car_alarms_triggered": {
         "points_per_alarm": -10,
@@ -216,7 +214,7 @@
         "points_per_pin": -5,
         "description": "Penalty for getting pinned by special infected",
         "source_field": "times_pinned",
-        "enabled": false
+        "enabled": true
       },
       "tank_rocks_hit": {
         "points_per_hit": -10,

@@ -39,7 +39,7 @@ class MVPCalculator {
                     },
                     penalties: {
                         teammate_kill: -100,
-                        ff_damage_multiplier: -2
+                        ff_damage_multiplier: -30
                     }
                 },
                 mvpCriteria: pointSystem.mvp_calculation?.ranking_criteria?.criteria || [
@@ -70,7 +70,7 @@ class MVPCalculator {
                     heal_teammate: 40,
                     revive_teammate: 25,
                     defib_teammate: 30,
-                    finale_win: 1000,
+                    finale_win: 3000,
                     molotov_use: 5,
                     pipe_use: 5,
                     bile_use: 5,
