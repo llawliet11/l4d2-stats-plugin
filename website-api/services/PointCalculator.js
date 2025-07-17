@@ -140,11 +140,6 @@ class PointCalculator {
                 if (value > 0) {
                     const multiplier = rule.points_per_damage || rule.points_per_kill || rule.points_per_death || 0;
                     penalty = value * Math.abs(multiplier); // Always positive for penalty calculation
-                    
-                    // Apply max penalty cap if specified
-                    if (rule.max_penalty && penalty > Math.abs(rule.max_penalty)) {
-                        penalty = Math.abs(rule.max_penalty);
-                    }
                 }
             }
 
@@ -217,7 +212,7 @@ class PointCalculator {
             case 'damage_percent * 100':
                 // Tank damage calculation
                 const tankHp = rule.tank_hp_estimate || 6000;
-                const damagePercent = Math.min(1.0, value / tankHp);
+                const damagePercent = value / tankHp;
                 return Math.floor(damagePercent * 100);
 
             case 'special_kills * save_ratio':

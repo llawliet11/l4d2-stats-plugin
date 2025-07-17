@@ -389,9 +389,6 @@ export default function(pool) {
                     if (warnings.length > 0) {
                         console.warn(`User ${user.steamid} validation warnings:`, warnings);
                     }
-
-                    // Limit points range to prevent database overflow
-                    points = Math.max(-50000, Math.min(50000, points));
                     
                     // Track total points calculated
                     totalPointsCalculated += points;

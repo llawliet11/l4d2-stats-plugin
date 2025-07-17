@@ -88,12 +88,12 @@
         "enabled": true
       },
       "finale_completion": {
-        "points_per_finale": 1000,
+        "points_per_finale": 5000,
         "description": "Bonus points for completing finale",
         "condition": "finale_time > 0"
       },
       "melee_kills": {
-        "points_per_kill": 2,
+        "points_per_kill": 1,
         "description": "Points per melee kill",
         "source_field": "melee_kills"
       },
@@ -153,7 +153,7 @@
     "description": "Point penalties for negative actions",
     "rules": {
       "friendly_fire_damage": {
-        "points_per_damage": -40,
+        "points_per_damage": -10,
         "description": "Penalty per HP damage dealt to teammates",
         "source_field": "survivor_ff",
         "max_penalty": -10000,
@@ -165,7 +165,7 @@
         "source_field": "ff_kills"
       },
       "deaths": {
-        "points_per_death": -50,
+        "points_per_death": -25,
         "description": "Penalty for dying",
         "source_field": "survivor_deaths",
         "enabled": false,
@@ -271,7 +271,7 @@
       },
       "penalties": {
         "teammate_kill": -100,
-        "ff_damage_multiplier": -3
+        "ff_damage_multiplier": -10
       },
       "bonuses": {
         "damage_taken_bonus_multiplier": 0.5,
