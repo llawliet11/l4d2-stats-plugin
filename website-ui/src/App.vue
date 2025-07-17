@@ -36,7 +36,7 @@
                 type="is-warning"
                 size="is-small"
                 @click="recalculatePoints"
-                :loading="recalculating"          
+                :loading="recalculating"
               >
                 Recalculate
               </b-button>
@@ -143,9 +143,12 @@ export default {
         const response = await this.$http.post('/api/recalculate')
 
         if (response.data.success) {
+          const stats = response.data.stats;
           this.$buefy.toast.open({
-            duration: 5000,
-            message: `Points recalculated successfully! Processed ${response.data.stats.sessions_processed} sessions. Total points: ${response.data.stats.total_points}`,
+            duration: 8000,
+            message: `Points recalculated successfully!
+            Overall: ${stats.users_processed} users processed, ${stats.total_points_calculated} total points.
+            Maps: ${stats.map_users_processed} map-user combinations processed, ${stats.total_map_points_calculated} total map points.`,
             type: 'is-success'
           })
 

@@ -389,50 +389,115 @@ export default function(pool) {
                     if (warnings.length > 0) {
                         console.warn(`User ${user.steamid} validation warnings:`, warnings);
                     }
-                    
+
                     // Track total points calculated
                     totalPointsCalculated += points;
-                    
+
                     // Update user points directly in stats_users table
                     await pool.execute(
                         "UPDATE stats_users SET points = ? WHERE steamid = ?",
                         [points, user.steamid]
                     );
-                    
+
                     // Debug log for first few users
                     if (processedCount < 5) {
                         console.log(`[/api/recalculate] User ${processedCount + 1}: ${user.steamid} calculated ${points} points`);
                         console.log(`  - Common Kills: ${user.common_kills || 0}, Special Kills: ${user.kills_all_specials || 0}`);
                         console.log(`  - FF Damage: ${user.survivor_ff || 0}, Finales Won: ${user.finales_won || 0}`);
                     }
-                    
+
                     processedCount++;
                 }
-                
+
                 // Log progress every batch
                 console.log(`[/api/recalculate] Processed ${Math.min(i + batchSize, users.length)}/${users.length} users`);
             }
+
+            // Recalculate points for stats_map_users table
+            console.log('[/api/recalculate] Starting map-specific points recalculation...');
+
+            // Get all map-user combinations from stats_map_users table
+            const [mapUsers] = await pool.execute(`
+                SELECT * FROM stats_map_users
+                ORDER BY steamid, mapid ASC
+            `);
+
+            console.log(`[/api/recalculate] Processing ${mapUsers.length} map-user combinations...`);
+
+            let mapProcessedCount = 0;
+            let totalMapPointsCalculated = 0;
+            const mapBatchSize = 50; // Smaller batch size for map calculations
+
+            for (let i = 0; i < mapUsers.length; i += mapBatchSize) {
+                const mapBatch = mapUsers.slice(i, i + mapBatchSize);
+
+                for (const mapUser of mapBatch) {
+                    try {
+                        // Calculate map-specific points using PointCalculator
+                        const mapPointBreakdown = pointCalculator.calculateMapPoints(mapUser);
+                        let mapPoints = mapPointBreakdown.total;
+
+                        // Track total map points calculated
+                        totalMapPointsCalculated += mapPoints;
+
+                        // Update map-user points in stats_map_users table
+                        await pool.execute(
+                            "UPDATE stats_map_users SET points = ? WHERE steamid = ? AND mapid = ?",
+                            [mapPoints, mapUser.steamid, mapUser.mapid]
+                        );
+
+                        // Debug log for first few map-users
+                        if (mapProcessedCount < 3) {
+                            console.log(`[/api/recalculate] Map-User ${mapProcessedCount + 1}: ${mapUser.steamid} on ${mapUser.mapid} calculated ${mapPoints} points`);
+                        }
+
+                        mapProcessedCount++;
+                    } catch (error) {
+                        console.error(`[/api/recalculate] Error calculating points for ${mapUser.steamid} on ${mapUser.mapid}:`, error.message);
+                        // Continue processing other map-users even if one fails
+                        mapProcessedCount++;
+                    }
+                }
+
+                // Log map progress every batch
+                console.log(`[/api/recalculate] Processed ${Math.min(i + mapBatchSize, mapUsers.length)}/${mapUsers.length} map-user combinations`);
+            }
+
+            console.log(`[/api/recalculate] Map-specific points recalculation completed. Processed ${mapProcessedCount} combinations, total points: ${totalMapPointsCalculated}`);
             
-            // Get final stats
+            // Get final stats for both tables
             const [finalStats] = await pool.execute(`
-                SELECT 
+                SELECT
                     COUNT(*) as total_users,
                     SUM(points) as total_points,
                     AVG(points) as avg_points,
                     MAX(points) as max_points
-                FROM stats_users 
+                FROM stats_users
                 WHERE points > 0
             `);
-            
+
+            const [finalMapStats] = await pool.execute(`
+                SELECT
+                    COUNT(*) as total_map_users,
+                    SUM(points) as total_map_points,
+                    AVG(points) as avg_map_points,
+                    MAX(points) as max_map_points
+                FROM stats_map_users
+                WHERE points > 0
+            `);
+
             console.log('[/api/recalculate] Recalculation completed successfully');
-            
+
             res.json({
                 success: true,
-                message: 'Points recalculated successfully',
+                message: 'Points recalculated successfully for both overall and map-specific statistics',
                 stats: {
                     users_processed: processedCount,
                     total_points_calculated: totalPointsCalculated,
-                    ...finalStats[0]
+                    map_users_processed: mapProcessedCount,
+                    total_map_points_calculated: totalMapPointsCalculated,
+                    overall_stats: finalStats[0],
+                    map_stats: finalMapStats[0]
                 }
             });
             
