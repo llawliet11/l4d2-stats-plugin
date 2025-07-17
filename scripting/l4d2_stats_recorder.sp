@@ -1025,19 +1025,22 @@ void SubmitPointsNow(int client) {
 	if(players[client].pointsQueue.Length > 0) {
 		char query[4098];
 		char escapedSteamId[64];
+		char escapedMapId[128];
 		g_db.Escape(players[client].steamid, escapedSteamId, sizeof(escapedSteamId));
-		
-		Format(query, sizeof(query), "INSERT INTO stats_points (steamid,type,amount,timestamp) VALUES ");
+		g_db.Escape(game.mapId, escapedMapId, sizeof(escapedMapId));
+
+		Format(query, sizeof(query), "INSERT INTO stats_points (steamid,type,amount,timestamp,mapId) VALUES ");
 		for(int i = 0; i < players[client].pointsQueue.Length; i++) {
 			int type = players[client].pointsQueue.Get(i, 0);
 			int amount = players[client].pointsQueue.Get(i, 1);
 			int timestamp = players[client].pointsQueue.Get(i, 2);
-			Format(query, sizeof(query), "%s('%s',%d,%d,%d)%c",
+			Format(query, sizeof(query), "%s('%s',%d,%d,%d,'%s')%c",
 				query,
 				escapedSteamId,
 				type,
 				amount,
 				timestamp,
+				escapedMapId,
 				i == players[client].pointsQueue.Length - 1 ? ';' : ',' // Semicolon on last entry
 			);
 		}
