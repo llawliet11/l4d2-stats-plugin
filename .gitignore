@@ -17,3 +17,6 @@ backups/
 
 # ignore apple 
 *.DS_Store
+
+# some script allowed
+!build-once.sh
