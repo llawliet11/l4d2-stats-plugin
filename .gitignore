@@ -8,6 +8,10 @@ databases.cfg
 .env.production
 .idea
 
+.local
+.user
+.bin
+
 # Backup files containing personal information
 backups/
 
