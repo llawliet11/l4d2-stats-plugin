@@ -45,6 +45,44 @@ class PointCalculator {
 
 
     /**
+     * Calculate points for map-specific statistics
+     * @param {Object} mapData - Raw data from stats_map_users
+     * @returns {Object} - Detailed point breakdown
+     */
+    calculateMapPoints(mapData) {
+        if (!this.config) {
+            throw new Error('Point system not initialized');
+        }
+
+        const breakdown = {
+            base_points: {},
+            penalties: {},
+            multipliers: {},
+            special_bonuses: {},
+            total: 0,
+            details: [],
+            data_source: 'stats_map_users'
+        };
+
+        // Calculate base points using map-specific data
+        this.calculateBasePoints(mapData, breakdown);
+
+        // Calculate penalties using map-specific data
+        this.calculatePenalties(mapData, breakdown);
+
+        // Apply multipliers (if enabled)
+        this.applyMultipliers(mapData, breakdown);
+
+        // Add special bonuses (if enabled)
+        this.calculateSpecialBonuses(mapData, breakdown);
+
+        // Calculate final total
+        breakdown.total = this.calculateFinalTotal(breakdown);
+
+        return breakdown;
+    }
+
+    /**
      * Calculate points for a single session/game
      * @param {Object} sessionData - Raw session data from stats_games
      * @returns {Object} - Detailed point breakdown
@@ -78,6 +116,130 @@ class PointCalculator {
         // Calculate final total
         breakdown.total = this.calculateFinalTotal(breakdown);
         
+        return breakdown;
+    }
+
+    /**
+     * Calculate points for lifetime user statistics
+     * @param {Object} userData - Raw data from stats_users
+     * @returns {Object} - Detailed point breakdown
+     */
+    calculateUserPoints(userData) {
+        if (!this.config) {
+            throw new Error('Point system not initialized');
+        }
+
+        const breakdown = {
+            base_points: {},
+            penalties: {},
+            multipliers: {},
+            special_bonuses: {},
+            total: 0,
+            details: [],
+            data_source: 'stats_users'
+        };
+
+        // Calculate base points using lifetime data
+        this.calculateBasePoints(userData, breakdown);
+
+        // Calculate penalties using lifetime data
+        this.calculatePenalties(userData, breakdown);
+
+        // Apply multipliers (if enabled)
+        this.applyMultipliers(userData, breakdown);
+
+        // Add special bonuses (if enabled)
+        this.calculateSpecialBonuses(userData, breakdown);
+
+        // Calculate final total
+        breakdown.total = this.calculateFinalTotal(breakdown);
+
+        return breakdown;
+    }
+
+    /**
+     * Calculate MVP points using map-specific or lifetime data
+     * @param {Object} userData - Raw data from stats_map_users or stats_users
+     * @param {string} calculationType - 'map' or 'overall'
+     * @returns {Object} - MVP point breakdown
+     */
+    calculateMVPPoints(userData, calculationType = 'overall') {
+        if (!this.config || !this.config.mvp_calculation) {
+            throw new Error('MVP calculation configuration not available');
+        }
+
+        const mvpConfig = this.config.mvp_calculation;
+        const breakdown = {
+            positive_actions: {},
+            penalties: {},
+            bonuses: {},
+            total: 0,
+            details: [],
+            calculation_type: calculationType,
+            data_source: calculationType === 'map' ? 'stats_map_users' : 'stats_users'
+        };
+
+        // Calculate positive actions
+        if (mvpConfig.point_values && mvpConfig.point_values.positive_actions) {
+            for (const [action, points] of Object.entries(mvpConfig.point_values.positive_actions)) {
+                const value = userData[action] || 0;
+                if (value > 0) {
+                    breakdown.positive_actions[action] = {
+                        value: value,
+                        points: value * points,
+                        description: `${action.replace(/_/g, ' ')}: ${value} × ${points}`
+                    };
+                }
+            }
+        }
+
+        // Calculate penalties
+        if (mvpConfig.point_values && mvpConfig.point_values.penalties) {
+            for (const [penalty, multiplier] of Object.entries(mvpConfig.point_values.penalties)) {
+                if (penalty === 'ff_damage_multiplier') {
+                    const ffDamage = userData.survivor_ff || 0;
+                    if (ffDamage > 0) {
+                        const penaltyPoints = ffDamage * Math.abs(multiplier);
+                        breakdown.penalties[penalty] = {
+                            value: ffDamage,
+                            penalty: penaltyPoints,
+                            description: `Friendly fire damage: ${ffDamage} × ${Math.abs(multiplier)}`
+                        };
+                    }
+                }
+            }
+        }
+
+        // Calculate bonuses (if any)
+        if (mvpConfig.point_values && mvpConfig.point_values.bonuses) {
+            for (const [bonus, config] of Object.entries(mvpConfig.point_values.bonuses)) {
+                if (bonus !== 'description') {
+                    // Bonus calculation logic would go here
+                    // This is placeholder for future bonus implementations
+                }
+            }
+        }
+
+        // Calculate final MVP total
+        let total = 0;
+
+        // Add positive actions
+        for (const action of Object.values(breakdown.positive_actions)) {
+            total += action.points;
+        }
+
+        // Subtract penalties
+        for (const penalty of Object.values(breakdown.penalties)) {
+            total -= penalty.penalty;
+        }
+
+        // Add bonuses
+        for (const bonus of Object.values(breakdown.bonuses)) {
+            total += bonus.points || 0;
+        }
+
+        breakdown.total = Math.max(0, total); // MVP points cannot be negative
+
         return breakdown;
     }
 

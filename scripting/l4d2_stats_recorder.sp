@@ -671,6 +671,10 @@ public void OnClientDisconnect(int client) {
 		}
 
 		FlushQueuedStats(client, true);
+
+		// Finalize map session on disconnect
+		FinalizeMapSession(client);
+
 		players[client].ResetFull();
 
 		//ResetSessionStats(client); //Can't reset session stats cause transitions!
@@ -743,7 +747,10 @@ void SetupUserInDB(int client, const char steamid[32]) {
 		
 		// Initialize map session tracking
 		players[client].mapSessionStart = GetTime();
-		
+
+		// Initialize map session record in stats_map_users
+		InitializeMapSession(client);
+
 		PrintToServer("[l4d2_stats_recorder] Setting up user %N with Steam ID: %s", client, steamid);
 		
 		char query[256];
@@ -777,6 +784,64 @@ void IncrementStat(int client, const char[] name, int amount = 1, bool lowPriori
 	}
 }
 
+//Initialize map session record for cumulative statistics tracking
+void InitializeMapSession(int client) {
+	if(client > 0 && !IsFakeClient(client) && IsClientConnected(client)) {
+		if (players[client].steamid[0] && game.mapId[0] && players[client].mapSessionStart > 0) {
+			if(g_db == INVALID_HANDLE) {
+				LogError("Database handle is invalid.");
+				return;
+			}
+
+			char query[1024];
+
+			// Initialize or update map session record with current session start time
+			// This ensures the record exists for cumulative statistics
+			Format(query, sizeof(query),
+				"INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, session_end) " ...
+				"SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, NULL " ...
+				"FROM stats_users WHERE steamid = '%s' " ...
+				"ON DUPLICATE KEY UPDATE " ...
+				"session_start = LEAST(session_start, %d), " ...
+				"session_end = NULL, " ...
+				"last_alias = VALUES(last_alias), " ...
+				"last_join_date = VALUES(last_join_date)",
+				players[client].steamid, game.mapId, players[client].mapSessionStart, players[client].steamid,
+				players[client].mapSessionStart);
+
+			#if defined DEBUG
+			PrintToServer("[Debug] Initializing map session for %N on map %s [%s]", client, game.mapId, players[client].steamid);
+			#endif
+			SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, DBPrio_Low);
+		}
+	}
+}
+
+//Finalize map session by setting session_end timestamp
+void FinalizeMapSession(int client) {
+	if(client > 0 && !IsFakeClient(client)) {
+		if (players[client].steamid[0] && game.mapId[0]) {
+			if(g_db == INVALID_HANDLE) {
+				LogError("Database handle is invalid.");
+				return;
+			}
+
+			char query[512];
+
+			// Update session_end timestamp for the current map session
+			Format(query, sizeof(query),
+				"UPDATE stats_map_users SET session_end = UNIX_TIMESTAMP() " ...
+				"WHERE steamid = '%s' AND mapid = '%s'",
+				players[client].steamid, game.mapId);
+
+			#if defined DEBUG
+			PrintToServer("[Debug] Finalizing map session for %N on map %s [%s]", client, game.mapId, players[client].steamid);
+			#endif
+			SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, DBPrio_Low);
+		}
+	}
+}
+
 //Increments both lifetime and map-specific statistics
 void IncrementBothStats(int client, const char[] name, int amount = 1, bool lowPriority = true) {
 	IncrementStat(client, name, amount, lowPriority);    // Lifetime stats
@@ -793,22 +858,26 @@ void IncrementMapStat(int client, const char[] name, int amount = 1, bool lowPri
 			}
 			int escaped_name_size = 2*strlen(name)+1;
 			char[] escaped_name = new char[escaped_name_size];
-			char query[512];
+			char query[1024];
 			g_db.Escape(name, escaped_name, escaped_name_size);
-			
-			// Insert or update the map session stats
-			// For insert, we need to get user data from stats_users first
-			Format(query, sizeof(query), 
+
+			// UPSERT: Insert new record or update existing cumulative stats
+			// Uses composite primary key (steamid, mapid) for cumulative tracking
+			Format(query, sizeof(query),
 				"INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, %s, session_end) " ...
 				"SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, %d, UNIX_TIMESTAMP() " ...
 				"FROM stats_users WHERE steamid = '%s' " ...
-				"ON DUPLICATE KEY UPDATE stats_map_users.%s = stats_map_users.%s + %d, session_end = UNIX_TIMESTAMP()",
+				"ON DUPLICATE KEY UPDATE " ...
+				"%s = %s + %d, " ...
+				"session_end = UNIX_TIMESTAMP(), " ...
+				"last_alias = VALUES(last_alias), " ...
+				"last_join_date = VALUES(last_join_date)",
 				escaped_name, players[client].steamid, game.mapId, players[client].mapSessionStart, amount, players[client].steamid,
 				escaped_name, escaped_name, amount);
-			
+
 			#if defined DEBUG
-			PrintToServer("[Debug] Updating Map Stat %s (+%d) for %N on map %s [%s]", name, amount, client, game.mapId, players[client].steamid);
-			#endif 
+			PrintToServer("[Debug] UPSERT Map Stat %s (+%d) for %N on map %s [%s]", name, amount, client, game.mapId, players[client].steamid);
+			#endif
 			SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, lowPriority ? DBPrio_Low : DBPrio_Normal);
 		}
 	}

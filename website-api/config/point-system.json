@@ -49,14 +49,14 @@
       "tank_kill_solo": {
         "points": 20,
         "description": "Bonus for solo tank kill",
-        "enabled": false,
-        "note": "Not tracked in current system"
+        "source_field": "tanks_killed_solo",
+        "enabled": true
       },
       "tank_kill_melee": {
         "points": 50,
         "description": "Bonus for melee tank kill",
-        "enabled": false,
-        "note": "Not tracked in current system"
+        "source_field": "tanks_killed_melee",
+        "enabled": true
       },
       "first_aid_shared": {
         "points_per_heal": 40,
@@ -85,7 +85,8 @@
         "points_per_pack": 20,
         "description": "Points for deploying ammo packs",
         "source_field": "packs_used",
-        "enabled": true
+        "enabled": false,
+        "note": "Field 'packs_used' not available in database schema"
       },
       "finale_completion": {
         "points_per_finale": 1000,
@@ -100,12 +101,16 @@
       "molotov_damage": {
         "points_per_damage": 0.05,
         "description": "Points per molotov damage",
-        "source_field": "damage_molotov"
+        "source_field": "damage_molotov",
+        "enabled": false,
+        "note": "Field 'damage_molotov' not available in database schema"
       },
       "pipe_bomb_kills": {
         "points_per_kill": 3,
         "description": "Points per pipe bomb kill",
-        "source_field": "kills_pipe"
+        "source_field": "kills_pipe",
+        "enabled": false,
+        "note": "Field 'kills_pipe' not available in database schema"
       },
       "heal_teammate_critical": {
         "points_per_heal": 60,
@@ -119,14 +124,14 @@
       "molotov_use": {
         "points_per_use": 5,
         "description": "Points for using molotov",
-        "enabled": false,
-        "note": "Usage not tracked, only damage/kills"
+        "source_field": "pickups_molotov",
+        "enabled": true
       },
       "pipe_use": {
         "points_per_use": 5,
         "description": "Points for using pipe bomb",
-        "enabled": false,
-        "note": "Usage not tracked, only kills"
+        "source_field": "pickups_pipe_bomb",
+        "enabled": true
       },
       "bile_use": {
         "points_per_use": 5,
@@ -137,14 +142,44 @@
       "pill_use": {
         "points_per_use": 10,
         "description": "Points for using pills",
-        "enabled": false,
-        "note": "Not tracked in current system"
+        "source_field": "pills_used",
+        "enabled": true
       },
       "adrenaline_use": {
         "points_per_use": 15,
         "description": "Points for using adrenaline",
-        "enabled": false,
-        "note": "Not tracked in current system"
+        "source_field": "adrenaline_used",
+        "enabled": true
+      },
+      "clear_pinned_teammates": {
+        "points_per_clear": 15,
+        "description": "Points for clearing pinned teammates",
+        "source_field": "cleared_pinned",
+        "enabled": true
+      },
+      "smoker_self_clear": {
+        "points_per_clear": 10,
+        "description": "Points for self-clearing from smokers",
+        "source_field": "smokers_selfcleared",
+        "enabled": true
+      },
+      "hunter_deadstop": {
+        "points_per_deadstop": 20,
+        "description": "Points for deadstopping hunters",
+        "source_field": "hunters_deadstopped",
+        "enabled": true
+      },
+      "witch_crown_angry": {
+        "points_per_crown": 35,
+        "description": "Bonus points for crowning angry witches",
+        "source_field": "witches_crowned_angry",
+        "enabled": true
+      },
+      "boomer_bile_hits": {
+        "points_per_hit": 3,
+        "description": "Points for boomer bile hits on enemies",
+        "source_field": "boomer_mellos",
+        "enabled": true
       }
     }
   },
@@ -155,14 +190,14 @@
       "friendly_fire_damage": {
         "points_per_damage": -10,
         "description": "Penalty per HP damage dealt to teammates",
-        "source_field": "survivor_ff",
-        "max_penalty": -10000,
-        "note": "Capped to prevent extreme penalties"
+        "source_field": "survivor_ff"
       },
       "teammate_kills": {
         "points_per_kill": -500,
         "description": "Heavy penalty for killing teammates",
-        "source_field": "ff_kills"
+        "source_field": "ff_kills",
+        "enabled": false,
+        "note": "Field 'ff_kills' not available in database schema"
       },
       "deaths": {
         "points_per_death": -25,
@@ -170,6 +205,42 @@
         "source_field": "survivor_deaths",
         "enabled": false,
         "note": "Currently disabled - deaths are tracked but not penalized"
+      },
+      "car_alarms_triggered": {
+        "points_per_alarm": -10,
+        "description": "Penalty for triggering car alarms",
+        "source_field": "caralarms_activated",
+        "enabled": true
+      },
+      "times_pinned_penalty": {
+        "points_per_pin": -5,
+        "description": "Penalty for getting pinned by special infected",
+        "source_field": "times_pinned",
+        "enabled": true
+      },
+      "tank_rocks_hit": {
+        "points_per_hit": -10,
+        "description": "Penalty for getting hit by tank rocks",
+        "source_field": "rocks_hitby",
+        "enabled": true
+      },
+      "clown_honks": {
+        "points_per_honk": -5,
+        "description": "Penalty for honking clowns",
+        "source_field": "clowns_honked",
+        "enabled": true
+      },
+      "idle_time_penalty": {
+        "points_per_minute": -2,
+        "description": "Penalty for idle time",
+        "source_field": "minutes_idle",
+        "enabled": true
+      },
+      "boomer_bile_self": {
+        "points_per_bile": -5,
+        "description": "Penalty for getting biled by boomer",
+        "source_field": "boomer_mellos_self",
+        "enabled": true
       }
     }
   },
@@ -233,10 +304,6 @@
     "session_requirements": {
       "minimum_duration": 60,
       "require_valid_timestamps": true
-    },
-    "limits": {
-      "minimum_session_points": -50000,
-      "maximum_session_points": 50000
     }
   },
 
@@ -273,16 +340,16 @@
       "description": "Fallback criteria for MVP ranking when points are tied",
       "criteria": [
         {
-          "field": "special_infected_kills",
+          "field": "kills_all_specials",
           "direction": "desc",
           "priority": 1,
           "description": "Special Infected Killed (highest)"
         },
         {
-          "field": "survivor_ff_count",
+          "field": "survivor_ff",
           "direction": "asc",
           "priority": 2,
-          "description": "Friendly Fire Count (lowest)"
+          "description": "Friendly Fire Damage (lowest)"
         },
         {
           "field": "common_kills",

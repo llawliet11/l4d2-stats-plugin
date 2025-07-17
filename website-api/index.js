@@ -21,6 +21,7 @@ import RouteCampaigns from './routes/campaigns.js'
 import RouteMaps from './routes/maps.js'
 import RouteTop from './routes/top.js'
 import RouteMisc from './routes/misc.js'
+import RouteValidation from './routes/validation.js'
 
 
 (async function() {
@@ -54,6 +55,7 @@ import RouteMisc from './routes/misc.js'
     app.use('/api/campaigns',   RouteCampaigns(pool))
     app.use('/api/maps',     RouteMaps(pool))
     app.use('/api/top',         RouteTop(pool))
+    app.use('/api/validation',  RouteValidation)
     app.use('/api/',            RouteMisc(pool))
 
     app.get('*',(req,res) => {

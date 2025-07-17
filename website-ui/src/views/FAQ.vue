@@ -56,30 +56,149 @@
                             </div>
                         </div>
 
-                        <!-- Dynamic Point Rules -->
+                        <!-- Comprehensive Point Rules Display -->
                         <div v-if="!loadingRules">
-                            <h6 class="title is-6 has-text-success">Positive Actions:</h6>
-                            <ul>
-                                <li v-for="(rule, key) in basePointRules" :key="key" v-if="rule.enabled !== false">
-                                    <span class="has-text-success">
-                                        +{{ rule.points_per_kill || rule.points_per_headshot || rule.points_per_damage || rule.points_per_heal || rule.points_per_revive || rule.points_per_defib || rule.points_per_crown || rule.points_per_save || rule.points_per_pack || rule.points_per_finale || rule.points || 0 }}
-                                    </span>
-                                    {{ rule.description }}
-                                    <em v-if="rule.note"> ({{ rule.note }})</em>
-                                </li>
-                            </ul>
+                            <!-- Combat Actions -->
+                            <div class="box mb-4">
+                                <h6 class="title is-6 has-text-success">
+                                    <b-icon icon="sword" size="is-small"></b-icon>
+                                    Combat Actions
+                                </h6>
+                                <div class="columns is-multiline">
+                                    <div v-for="(rule, key) in combatRules" :key="key" class="column is-half">
+                                        <div class="notification is-light is-success">
+                                            <div class="level is-mobile">
+                                                <div class="level-left">
+                                                    <div class="level-item">
+                                                        <div>
+                                                            <p class="heading">{{ rule.description }}</p>
+                                                            <p class="title is-6 has-text-success">
+                                                                +{{ getPointValue(rule) }} {{ getPointUnit(rule) }}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p v-if="rule.note" class="help">{{ rule.note }}</p>
+                                            <p v-if="rule.calculation" class="help has-text-info">
+                                                <strong>Formula:</strong> {{ getCalculationDescription(rule) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                            <br>
-                            <h6 class="title is-6 has-text-danger">Penalties:</h6>
-                            <ul>
-                                <li v-for="(rule, key) in penaltyRules" :key="key" v-if="rule.enabled !== false">
-                                    <span class="has-text-danger">
-                                        {{ rule.points_per_damage || rule.points_per_kill || rule.points_per_death || 0 }}
-                                    </span>
-                                    {{ rule.description }}
-                                    <em v-if="rule.note"> ({{ rule.note }})</em>
-                                </li>
-                            </ul>
+                            <!-- Teamwork Actions -->
+                            <div class="box mb-4">
+                                <h6 class="title is-6 has-text-info">
+                                    <b-icon icon="account-group" size="is-small"></b-icon>
+                                    Teamwork & Support
+                                </h6>
+                                <div class="columns is-multiline">
+                                    <div v-for="(rule, key) in teamworkRules" :key="key" class="column is-half">
+                                        <div class="notification is-light is-info">
+                                            <div class="level is-mobile">
+                                                <div class="level-left">
+                                                    <div class="level-item">
+                                                        <div>
+                                                            <p class="heading">{{ rule.description }}</p>
+                                                            <p class="title is-6 has-text-info">
+                                                                +{{ getPointValue(rule) }} {{ getPointUnit(rule) }}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p v-if="rule.note" class="help">{{ rule.note }}</p>
+                                            <p v-if="rule.calculation" class="help has-text-info">
+                                                <strong>Formula:</strong> {{ getCalculationDescription(rule) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Special Bonuses -->
+                            <div class="box mb-4" v-if="specialBonusRules.length > 0">
+                                <h6 class="title is-6 has-text-warning">
+                                    <b-icon icon="star" size="is-small"></b-icon>
+                                    Special Bonuses
+                                </h6>
+                                <div class="columns is-multiline">
+                                    <div v-for="(rule, key) in specialBonusRules" :key="key" class="column is-half">
+                                        <div class="notification is-light is-warning">
+                                            <div class="level is-mobile">
+                                                <div class="level-left">
+                                                    <div class="level-item">
+                                                        <div>
+                                                            <p class="heading">{{ rule.description }}</p>
+                                                            <p class="title is-6 has-text-warning">
+                                                                +{{ getPointValue(rule) }} {{ getPointUnit(rule) }}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p v-if="rule.note" class="help">{{ rule.note }}</p>
+                                            <p v-if="rule.calculation" class="help has-text-info">
+                                                <strong>Formula:</strong> {{ getCalculationDescription(rule) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Penalties -->
+                            <div class="box mb-4">
+                                <h6 class="title is-6 has-text-danger">
+                                    <b-icon icon="alert" size="is-small"></b-icon>
+                                    Penalties
+                                </h6>
+                                <div class="columns is-multiline">
+                                    <div v-for="(rule, key) in penaltyRules" :key="key" v-if="rule.enabled !== false" class="column is-half">
+                                        <div class="notification is-light is-danger">
+                                            <div class="level is-mobile">
+                                                <div class="level-left">
+                                                    <div class="level-item">
+                                                        <div>
+                                                            <p class="heading">{{ rule.description }}</p>
+                                                            <p class="title is-6 has-text-danger">
+                                                                {{ getPointValue(rule) }} {{ getPointUnit(rule) }}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p v-if="rule.note" class="help">{{ rule.note }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Point Calculation Summary -->
+                            <div class="box">
+                                <h6 class="title is-6">
+                                    <b-icon icon="calculator" size="is-small"></b-icon>
+                                    Point Calculation Formula
+                                </h6>
+                                <div class="content">
+                                    <p><strong>Your session points are calculated as:</strong></p>
+                                    <div class="notification is-light">
+                                        <p class="has-text-centered is-size-5">
+                                            <strong>Total Points = Base Points - Penalties + Special Bonuses</strong>
+                                        </p>
+                                    </div>
+                                    <p>Where:</p>
+                                    <ul>
+                                        <li><strong>Base Points:</strong> Sum of all positive actions (combat + teamwork)</li>
+                                        <li><strong>Penalties:</strong> Deductions for negative actions (friendly fire, team kills)</li>
+                                        <li><strong>Special Bonuses:</strong> Additional rewards for exceptional performance</li>
+                                    </ul>
+                                    <p v-if="calculationSettings.round_final_score" class="help">
+                                        Final scores are rounded to {{ calculationSettings.decimal_places || 0 }} decimal places.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
                         <br>
@@ -91,8 +210,7 @@
                             <li>Cooldown persists through team wipes and map restarts</li>
                         </ul>
 
-                      <br>
-                      <p><strong>Tank Kill Points:</strong> When a tank is killed, the 100 points are distributed among all players who participated in the current game session based on their damage contribution. For example, if 4 players fight a tank and deal 50%, 30%, 15%, and 5% damage respectively, they receive 50, 30, 15, and 5 points. Solo and melee bonuses are awarded only to the player who delivers the killing blow.</p>
+
                     </div>
                 </div>
             </b-collapse>
@@ -117,26 +235,26 @@
 
                         <h6 class="title is-6 has-text-success">Positive Actions:</h6>
                         <ul>
-                            <li><strong>Special Infected Kills × {{ mvpPositiveActions.special_kill || 6 }}</strong> - Reward skilled gameplay</li>
-                            <li><strong>Common Kills × {{ mvpPositiveActions.common_kill || 1 }}</strong> - Basic zombie clearing</li>
-                            <li><strong>Tank Kills × {{ mvpPositiveActions.tank_kill_max || 100 }}</strong> - Major threat elimination</li>
-                            <li><strong>Witch Kills × {{ mvpPositiveActions.witch_kill || 15 }}</strong> - Precision kills</li>
-                            <li><strong>Heals × {{ mvpPositiveActions.heal_teammate || 40 }}</strong> - Team support</li>
-                            <li><strong>Revives × {{ mvpPositiveActions.revive_teammate || 25 }}</strong> - Saving teammates</li>
-                            <li><strong>Defibs × {{ mvpPositiveActions.defib_teammate || 30 }}</strong> - Critical rescues</li>
-                            <li><strong>Finales Won × {{ mvpPositiveActions.finale_win || 1000 }}</strong> - Campaign completion</li>
-                            <li><strong>Molotovs Used × {{ mvpPositiveActions.molotov_use || 5 }}</strong> - Tactical throwables</li>
-                            <li><strong>Pipe Bombs Used × {{ mvpPositiveActions.pipe_use || 5 }}</strong> - Area control</li>
-                            <li><strong>Bile Bombs Used × {{ mvpPositiveActions.bile_use || 5 }}</strong> - Distraction tactics</li>
-                            <li><strong>Pills Used × {{ mvpPositiveActions.pill_use || 10 }}</strong> - Self-care</li>
-                            <li><strong>Adrenaline Used × {{ mvpPositiveActions.adrenaline_use || 15 }}</strong> - Speed boost usage</li>
-                            <li><strong>Damage Taken Bonus × {{ mvpPointValues.bonuses?.damage_taken_bonus_multiplier || 0.5 }}</strong> - Reward for taking less damage than average</li>
+                            <li v-for="(value, key) in mvpPositiveActions" :key="key">
+                                <strong>{{ getMvpActionDescription(key) }} × {{ value }}</strong> - {{ getMvpActionNote(key) }}
+                            </li>
                         </ul>
+
+                        <!-- MVP Bonuses Section -->
+                        <div v-if="mvpPointValues.bonuses && Object.keys(mvpPointValues.bonuses).length > 0">
+                            <h6 class="title is-6 has-text-warning">Bonuses:</h6>
+                            <ul>
+                                <li v-for="(value, key) in mvpPointValues.bonuses" :key="key" v-if="key !== 'description'">
+                                    <strong>{{ getMvpBonusDescription(key) }} × {{ value }}</strong> - {{ mvpPointValues.bonuses.description || 'Special bonus calculation' }}
+                                </li>
+                            </ul>
+                        </div>
 
                         <h6 class="title is-6 has-text-danger">Penalties:</h6>
                         <ul>
-                            <li><strong>Teammate Kills × {{ mvpPenalties.teammate_kill || -100 }}</strong> - Severe penalty</li>
-                            <li><strong>Friendly Fire Damage × {{ mvpPenalties.ff_damage_multiplier || -2 }}</strong> - Per damage point dealt to teammates</li>
+                            <li v-for="(value, key) in mvpPenalties" :key="key">
+                                <strong>{{ getMvpPenaltyDescription(key) }} × {{ value }}</strong> - {{ getMvpPenaltyNote(key) }}
+                            </li>
                         </ul>
 
                         <p><strong>The player with the highest MVP Points total is awarded MVP.</strong> This system rewards good teamwork, skilled gameplay, and penalizes excessive friendly fire.</p>
@@ -163,6 +281,66 @@ export default {
   async mounted() {
     await this.loadPointSystem()
   },
+
+  computed: {
+    basePointRules() {
+      return this.pointSystem?.base_points?.rules || {}
+    },
+    penaltyRules() {
+      return this.pointSystem?.penalties?.rules || {}
+    },
+    mvpPointValues() {
+      return this.pointSystem?.mvp_calculation?.point_values || {}
+    },
+    mvpPositiveActions() {
+      return this.mvpPointValues?.positive_actions || {}
+    },
+    mvpPenalties() {
+      return this.mvpPointValues?.penalties || {}
+    },
+    systemVersion() {
+      return this.pointSystem?.version || 'Unknown'
+    },
+    lastUpdated() {
+      return this.pointSystem?.last_updated || 'Unknown'
+    },
+    calculationSettings() {
+      return this.pointSystem?.calculation_settings || {}
+    },
+
+    // Categorized rules for better organization
+    combatRules() {
+      const rules = this.basePointRules
+      const combatKeys = [
+        'common_kills', 'common_headshots', 'special_infected_kills',
+        'witch_kills', 'witch_crowns', 'tank_kill_max', 'tank_kill_solo',
+        'tank_kill_melee', 'tank_damage'
+      ]
+      return this.filterRulesByKeys(rules, combatKeys)
+    },
+
+    teamworkRules() {
+      const rules = this.basePointRules
+      const teamworkKeys = [
+        'first_aid_shared', 'first_aid_critical', 'revive_others',
+        'defib_others', 'teammate_saves', 'finale_completion',
+        'molotov_use', 'pipe_bomb_use', 'bile_bomb_use',
+        'pills_used', 'adrenaline_used'
+      ]
+      return this.filterRulesByKeys(rules, teamworkKeys)
+    },
+
+    specialBonusRules() {
+      const rules = this.basePointRules
+      const specialKeys = [
+        'finale_completion', 'perfect_round', 'no_damage_taken'
+      ]
+      return this.filterRulesByKeys(rules, specialKeys).filter(rule =>
+        rule.condition || rule.calculation === 'special'
+      )
+    }
+  },
+
   methods: {
     async loadPointSystem() {
       try {
@@ -228,29 +406,111 @@ export default {
       } finally {
         this.reloading = false
       }
-    }
-  },
-  computed: {
-    basePointRules() {
-      return this.pointSystem?.base_points?.rules || {}
     },
-    penaltyRules() {
-      return this.pointSystem?.penalties?.rules || {}
+
+    // Helper methods for displaying point rules
+    filterRulesByKeys(rules, keys) {
+      return keys.map(key => rules[key]).filter(rule =>
+        rule && rule.enabled !== false
+      )
     },
-    mvpPointValues() {
-      return this.pointSystem?.mvp_calculation?.point_values || {}
+
+    getPointValue(rule) {
+      return rule.points_per_kill || rule.points_per_headshot ||
+             rule.points_per_damage || rule.points_per_heal ||
+             rule.points_per_revive || rule.points_per_defib ||
+             rule.points_per_crown || rule.points_per_save ||
+             rule.points_per_pack || rule.points_per_finale ||
+             rule.points || 0
     },
-    mvpPositiveActions() {
-      return this.mvpPointValues?.positive_actions || {}
+
+    getPointUnit(rule) {
+      if (rule.points_per_kill) return 'per kill'
+      if (rule.points_per_headshot) return 'per headshot'
+      if (rule.points_per_damage) return 'per damage'
+      if (rule.points_per_heal) return 'per heal'
+      if (rule.points_per_revive) return 'per revive'
+      if (rule.points_per_defib) return 'per defib'
+      if (rule.points_per_crown) return 'per crown'
+      if (rule.points_per_save) return 'per save'
+      if (rule.points_per_pack) return 'per pack'
+      if (rule.points_per_finale) return 'per finale'
+      return 'points'
     },
-    mvpPenalties() {
-      return this.mvpPointValues?.penalties || {}
+
+    getCalculationDescription(rule) {
+      if (rule.calculation === 'tank_damage') {
+        return 'Tank Damage ÷ 6000 × 100 (max 100 points)'
+      }
+      if (rule.calculation === 'teammate_saves') {
+        return 'Special Kills × 0.3 × 10'
+      }
+      if (rule.calculation === 'special') {
+        return rule.formula || 'Special calculation applied'
+      }
+      return rule.calculation || 'Standard calculation'
     },
-    systemVersion() {
-      return this.pointSystem?.version || 'Unknown'
+
+    // Helper methods for MVP section
+    getMvpActionDescription(key) {
+      const descriptions = {
+        'common_kill': 'Common Kills',
+        'special_kill': 'Special Infected Kills',
+        'tank_kill_max': 'Tank Kills',
+        'witch_kill': 'Witch Kills',
+        'heal_teammate': 'Heals',
+        'revive_teammate': 'Revives',
+        'defib_teammate': 'Defibs',
+        'finale_win': 'Finales Won',
+        'molotov_use': 'Molotovs Used',
+        'pipe_use': 'Pipe Bombs Used',
+        'bile_use': 'Bile Bombs Used',
+        'pill_use': 'Pills Used',
+        'adrenaline_use': 'Adrenaline Used'
+      }
+      return descriptions[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
     },
-    lastUpdated() {
-      return this.pointSystem?.last_updated || 'Unknown'
+
+    getMvpActionNote(key) {
+      const notes = {
+        'common_kill': 'Basic zombie clearing',
+        'special_kill': 'Reward skilled gameplay',
+        'tank_kill_max': 'Major threat elimination',
+        'witch_kill': 'Precision kills',
+        'heal_teammate': 'Team support',
+        'revive_teammate': 'Saving teammates',
+        'defib_teammate': 'Critical rescues',
+        'finale_win': 'Campaign completion',
+        'molotov_use': 'Tactical throwables',
+        'pipe_use': 'Area control',
+        'bile_use': 'Distraction tactics',
+        'pill_use': 'Self-care',
+        'adrenaline_use': 'Speed boost usage'
+      }
+      return notes[key] || 'Positive action points'
+    },
+
+    getMvpBonusDescription(key) {
+      const descriptions = {
+        'damage_taken_bonus_multiplier': 'Damage Taken Bonus'
+      }
+      return descriptions[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    },
+
+    getMvpPenaltyDescription(key) {
+      const descriptions = {
+        'teammate_kill': 'Teammate Kills',
+        'ff_damage_multiplier': 'Friendly Fire Damage'
+      }
+      return descriptions[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    },
+
+    getMvpPenaltyNote(key) {
+      const notes = {
+        'teammate_kill': 'Severe penalty',
+        'ff_damage_multiplier': 'Per damage point dealt to teammates'
+      }
+      return notes[key] || 'Penalty points'
     }
   }
 }

@@ -97,9 +97,7 @@ Result: Minimal impact, allows focus on positive contributions
   "friendly_fire_damage": {
     "points_per_damage": -40,
     "description": "Penalty per HP damage dealt to teammates",
-    "source_field": "survivor_ff",
-    "max_penalty": -10000,
-    "note": "Capped to prevent extreme penalties"
+    "source_field": "survivor_ff"
   }
 }
 ```
