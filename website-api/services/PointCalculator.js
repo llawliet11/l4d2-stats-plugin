@@ -260,21 +260,12 @@ class PointCalculator {
     }
 
     /**
-     * Validate session data against reasonable limits
+     * Validate session data - disabled, no limits applied
      * @param {Object} sessionData - Session data to validate
-     * @returns {Array} - Array of validation warnings
+     * @returns {Array} - Empty array (no validation)
      */
     validateSessionData(sessionData) {
-        const warnings = [];
-        const limits = this.config.validation.max_reasonable_values;
-        
-        for (const [field, maxValue] of Object.entries(limits)) {
-            if (sessionData[field] && sessionData[field] > maxValue) {
-                warnings.push(`${field} value ${sessionData[field]} exceeds reasonable limit of ${maxValue}`);
-            }
-        }
-        
-        return warnings;
+        return []; // No validation, no limits
     }
 }
 

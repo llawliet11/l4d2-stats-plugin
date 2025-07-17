@@ -88,9 +88,9 @@
         "enabled": true
       },
       "finale_completion": {
-        "points_per_finale": 5000,
+        "points_per_finale": 1000,
         "description": "Bonus points for completing finale",
-        "condition": "finale_time > 0"
+        "source_field": "finales_won"
       },
       "melee_kills": {
         "points_per_kill": 1,
@@ -240,16 +240,7 @@
     }
   },
 
-  "validation": {
-    "description": "Data validation rules",
-    "max_reasonable_values": {
-      "common_kills": 5000,
-      "special_infected_kills": 1000,
-      "survivor_ff": 2000,
-      "damage_to_tank": 50000,
-      "description": "Maximum reasonable values to detect data corruption"
-    }
-  },
+
 
   "mvp_calculation": {
     "description": "MVP point calculation system for determining best player",
@@ -262,7 +253,7 @@
         "heal_teammate": 40,
         "revive_teammate": 25,
         "defib_teammate": 30,
-        "finale_win": 1000,
+        "finale_win": 3000,
         "molotov_use": 5,
         "pipe_use": 5,
         "bile_use": 5,
