@@ -89,7 +89,7 @@
         "note": "Field 'packs_used' not available in database schema"
       },
       "finale_completion": {
-        "points_per_finale": 2000,
+        "points_per_finale": 3000,
         "description": "Bonus points for completing finale",
         "source_field": "finales_won"
       },
