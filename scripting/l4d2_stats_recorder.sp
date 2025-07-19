@@ -1834,6 +1834,8 @@ public void Event_InfectedDeath(Event event, const char[] name, bool dontBroadca
 		if(headshot) {
 			players[attacker].RecordPoint(PType_Headshot, 2);
 			players[attacker].wpn.headshots++;
+			IncrementStat(attacker, "common_headshots", 1);
+			IncrementMapStat(attacker, "common_headshots", 1);
 		}
 
 		players[attacker].RecordPoint(PType_CommonKill, 1);

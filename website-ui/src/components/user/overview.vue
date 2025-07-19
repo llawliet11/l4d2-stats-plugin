@@ -119,6 +119,10 @@
                       <td class="tvalue">{{user.common_kills | formatNumber}}</td>
                   </tr>
                   <tr>
+                      <td>Common Headshots</td>
+                      <td class="tvalue">{{user.common_headshots | formatNumber}}</td>
+                  </tr>
+                  <tr>
                       <td>With Minigun</td>
                       <td class="tvalue">{{user.kills_minigun | formatNumber}}</td>
                   </tr>
