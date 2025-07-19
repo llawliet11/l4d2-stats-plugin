@@ -48,7 +48,28 @@
     "Healing Teammate",  // PType_HealOther,
     "Reviving Teammate",  // PType_ReviveOther,
     "Defibbing Teammate",  // PType_ResurrectOther,
-    "Deploying Ammo"  // PType_DeployAmmo
+    "Deploying Ammo",  // PType_DeployAmmo
+    // NEW TYPES - Base Points:
+    "Witch Crown",  // PType_WitchCrown = 14
+    "Melee Kill",  // PType_MeleeKill = 15
+    "Pills Used",  // PType_PillUse = 16
+    "Adrenaline Used",  // PType_AdrenalineUse = 17
+    "Molotov Used",  // PType_MolotovUse = 18
+    "Pipe Bomb Used",  // PType_PipeUse = 19
+    "Bile Bomb Used",  // PType_BileUse = 20
+    "Tank Damage",  // PType_TankDamage = 21
+    "Cleared Pinned Teammate",  // PType_ClearPinned = 22
+    "Smoker Self Clear",  // PType_SmokerSelfClear = 23
+    "Hunter Deadstop",  // PType_HunterDeadstop = 24
+    "Boomer Bile Hit",  // PType_BoomerBileHit = 25
+    // NEW TYPES - Penalties:
+    "Death Penalty",  // PType_Death = 26
+    "Car Alarm Penalty",  // PType_CarAlarm = 27
+    "Pinned Penalty",  // PType_TimesPinned = 28
+    "Tank Rock Hit Penalty",  // PType_TankRockHit = 29
+    "Clown Honk Penalty",  // PType_ClownHonk = 30
+    "Boomer Bile Self Penalty",  // PType_BoomerBileSelf = 31
+    "Teammate Kill Penalty"  // PType_TeammateKill = 32
   ]
   export default {
     metaInfo() {

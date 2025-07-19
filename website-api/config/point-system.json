@@ -85,7 +85,7 @@
         "points_per_pack": 20,
         "description": "Points for deploying ammo packs",
         "source_field": "packs_used",
-        "enabled": false,
+        "enabled": true,
         "note": "Field 'packs_used' not available in database schema"
       },
       "finale_completion": {

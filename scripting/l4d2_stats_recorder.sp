@@ -144,7 +144,28 @@ enum PointRecordType {
 	PType_HealOther,
 	PType_ReviveOther,
 	PType_ResurrectOther,
-	PType_DeployAmmo
+	PType_DeployAmmo,
+	// NEW TYPES - Base Points:
+	PType_WitchCrown,           // 14 - Bonus points for crowning witch
+	PType_MeleeKill,            // 15 - Points per melee kill
+	PType_PillUse,              // 16 - Points for using pills
+	PType_AdrenalineUse,        // 17 - Points for using adrenaline
+	PType_MolotovUse,           // 18 - Points for using molotov
+	PType_PipeUse,              // 19 - Points for using pipe bomb
+	PType_BileUse,              // 20 - Points for using bile bomb
+	PType_TankDamage,           // 21 - Points per tank damage
+	PType_ClearPinned,          // 22 - Points for clearing pinned teammates
+	PType_SmokerSelfClear,      // 23 - Points for self-clearing from smokers
+	PType_HunterDeadstop,       // 24 - Points for deadstopping hunters
+	PType_BoomerBileHit,        // 25 - Points for boomer bile hits on enemies
+	// NEW TYPES - Penalties:
+	PType_Death,                // 26 - Penalty for dying
+	PType_CarAlarm,             // 27 - Penalty for triggering car alarms
+	PType_TimesPinned,          // 28 - Penalty for getting pinned by special infected
+	PType_TankRockHit,          // 29 - Penalty for getting hit by tank rocks
+	PType_ClownHonk,            // 30 - Penalty for honking clowns
+	PType_BoomerBileSelf,       // 31 - Penalty for getting biled by boomer
+	PType_TeammateKill          // 32 - Heavy penalty for killing teammates
 }
 
 enum struct WeaponStatistics {
@@ -1782,6 +1803,7 @@ Action SoundHook(int clients[MAXPLAYERS], int& numClients, char sample[PLATFORM_
 			if(survivorPos[0] == zPos[0] && survivorPos[1] == zPos[1] && survivorPos[2] == zPos[2]) {
 				game.clownHonks++;
 				players[client].clownsHonked++;
+				players[client].RecordPoint(PType_ClownHonk, -5);
 				return Plugin_Continue;
 			}
 		}
@@ -1852,12 +1874,16 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 		} else if(attacker_team == 3) {
 			players[attacker].damageInfectedGiven += dmg;
 		}
-		if(attacker_team == 2 && victim_team == 2) {
+		if(attacker_team == 2 && victim_team == 2 && attacker != victim) {
 			// Record raw friendly fire damage - penalty calculation handled by API
 			players[attacker].damageSurvivorFF += dmg;
 			players[attacker].damageSurvivorFFCount++;
 			players[victim].damageFFTaken += dmg;
 			players[victim].damageFFTakenCount++;
+
+			// Record individual FF damage points with variable penalty based on damage
+			int penalty = -30; // Base penalty from point-system.json
+			players[attacker].RecordPoint(PType_FriendlyFire, penalty);
 
 			// Update map-specific stats with raw damage
 			IncrementMapStat(attacker, "survivor_ff", dmg);
@@ -1884,6 +1910,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 		if(!IsFakeClient(victim)) {
 			if(victim_team == 2) {
 				IncrementBothStats(victim, "survivor_deaths", 1);
+				players[victim].RecordPoint(PType_Death, -10);
 				float pos[3];
 				GetClientAbsOrigin(victim, pos);
 				players[victim].RecordHeatMap(HeatMap_Death, pos);
@@ -1909,9 +1936,10 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 					players[attacker].molotovKills++;
 				}
 				IncrementBothStats(victim, "infected_deaths", 1);
-			} else if(victim_team == 2) {
+			} else if(victim_team == 2 && attacker != victim) {
 				// Record raw teammate kill stat - penalty calculation handled by API
 				IncrementBothStats(attacker, "ff_kills", 1);
+				players[attacker].RecordPoint(PType_TeammateKill, -500);
 			}
 		}
 	}
@@ -1921,6 +1949,7 @@ public void Event_MeleeKill(Event event, const char[] name, bool dontBroadcast) 
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if(client > 0 && !IsFakeClient(client)) {
 		players[client].RecordPoint(PType_CommonKill, 1);
+		players[client].RecordPoint(PType_MeleeKill, 1);
 	}
 }
 public void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast) {
@@ -2060,6 +2089,12 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 		} else if(StrEqual(name, "defibrillator_used", true)) {
 			players[client].RecordPoint(PType_ResurrectOther, 50);
 			IncrementBothStats(client, "defibs_used", 1);
+		} else if(StrEqual(name, "pills_used", true)) {
+			IncrementStat(client, name, 1);
+			players[client].RecordPoint(PType_PillUse, 10);
+		} else if(StrEqual(name, "adrenaline_used", true)) {
+			IncrementStat(client, name, 1);
+			players[client].RecordPoint(PType_AdrenalineUse, 15);
 		} else{
 			IncrementStat(client, name, 1);
 		}
@@ -2077,6 +2112,7 @@ public void Event_CarAlarm(Event event, const char[] name, bool dontBroadcast) {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if(client > 0 && !IsFakeClient(client)) {
 		IncrementStat(client, "caralarms_activated", 1);
+		players[client].RecordPoint(PType_CarAlarm, -10);
 	}
 }
 public void Event_WitchKilled(Event event, const char[] name, bool dontBroadcast) {
@@ -2153,13 +2189,16 @@ void EntityCreateCallback(int entity) {
 
 	GetEntityClassname(entity, class, sizeof(class));
 	int entOwner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
-	if(entOwner > 0 && entOwner <= MaxClients) {
+	if(entOwner > 0 && entOwner <= MaxClients && !IsFakeClient(entOwner)) {
 		if(StrContains(class, "vomitjar", true) > -1) {
 			IncrementStat(entOwner, "throws_puke", 1);
+			players[entOwner].RecordPoint(PType_BileUse, 5);
 		} else if(StrContains(class, "molotov", true) > -1) {
 			IncrementStat(entOwner, "throws_molotov", 1);
+			players[entOwner].RecordPoint(PType_MolotovUse, 5);
 		} else if(StrContains(class, "pipe_bomb", true) > -1) {
 			IncrementStat(entOwner, "throws_pipe", 1);
+			players[entOwner].RecordPoint(PType_PipeUse, 5);
 		}
 	}
 }
@@ -2368,23 +2407,31 @@ void Event_FinaleWin(Event event, const char[] name, bool dontBroadcast) {
 ///////////////////////////
 public void OnWitchCrown(int survivor, int damage) {
 	IncrementStat(survivor, "witches_crowned", 1);
+	players[survivor].RecordPoint(PType_WitchCrown, 25);
 }
 public void OnSmokerSelfClear( int survivor, int smoker, bool withShove ) {
 	IncrementStat(survivor, "smokers_selfcleared", 1);
+	players[survivor].RecordPoint(PType_SmokerSelfClear, 10);
 }
 public void OnTankRockEaten( int tank, int survivor ) {
 	IncrementStat(survivor, "rocks_hitby", 1);
+	players[survivor].RecordPoint(PType_TankRockHit, -10);
 }
 public void OnHunterDeadstop(int survivor, int hunter) {
 	IncrementStat(survivor, "hunters_deadstopped", 1);
+	players[survivor].RecordPoint(PType_HunterDeadstop, 20);
 }
 public void OnSpecialClear( int clearer, int pinner, int pinvictim, int zombieClass, float timeA, float timeB, bool withShove ) {
 	IncrementStat(clearer, "cleared_pinned", 1);
 	IncrementStat(pinvictim, "times_pinned", 1);
-	
+
 	// Award points for saving teammate from special infected
 	if(clearer > 0 && !IsFakeClient(clearer)) {
-		players[clearer].RecordPoint(PType_Generic, 20);
+		players[clearer].RecordPoint(PType_ClearPinned, 15);
+	}
+	// Penalty for getting pinned
+	if(pinvictim > 0 && !IsFakeClient(pinvictim)) {
+		players[pinvictim].RecordPoint(PType_TimesPinned, -5);
 	}
 }
 ////////////////////////////
