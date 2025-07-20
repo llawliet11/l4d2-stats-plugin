@@ -9,34 +9,40 @@
       "common_kills": {
         "points_per_kill": 1,
         "description": "Points per common infected kill",
-        "source_field": "common_kills"
+        "source_field": "common_kills",
+        "type": 2
       },
       "common_headshots": {
         "points_per_headshot": 2,
         "description": "Bonus points for headshot kills",
-        "source_field": "common_headshots"
+        "source_field": "common_headshots",
+        "type": 8
       },
       "special_infected_kills": {
         "points_per_kill": 6,
         "description": "Points per special infected kill",
-        "source_field": "kills_all_specials"
+        "source_field": "kills_all_specials",
+        "type": 3
       },
       "witch_kills": {
         "points_per_kill": 15,
         "description": "Points for killing witch",
-        "source_field": "kills_witch"
+        "source_field": "kills_witch",
+        "type": 5
       },
       "witch_crowns": {
         "points_per_crown": 25,
         "description": "Bonus points for crowning witch",
-        "source_field": "witches_crowned"
+        "source_field": "witches_crowned",
+        "type": 14
       },
       "tank_damage": {
         "points_per_damage": 0.1,
         "description": "Points per damage dealt to tank",
         "source_field": "damage_to_tank",
         "enabled": false,
-        "note": "Disabled in favor of tank_kill_max calculation"
+        "note": "Disabled in favor of tank_kill_max calculation",
+        "type": 21
       },
       "tank_kill_max": {
         "points": 100,
@@ -44,34 +50,40 @@
         "calculation": "damage_percent * 100",
         "tank_hp_estimate": 6000,
         "source_field": "damage_to_tank",
-        "enabled": true
+        "enabled": true,
+        "type": 4
       },
       "tank_kill_solo": {
         "points": 20,
         "description": "Bonus for solo tank kill",
         "source_field": "tanks_killed_solo",
-        "enabled": true
+        "enabled": true,
+        "type": 6
       },
       "tank_kill_melee": {
         "points": 50,
         "description": "Bonus for melee tank kill",
         "source_field": "tanks_killed_melee",
-        "enabled": true
+        "enabled": true,
+        "type": 7
       },
       "first_aid_shared": {
         "points_per_heal": 25,
         "description": "Points for healing teammates",
-        "source_field": "heal_others"
+        "source_field": "heal_others",
+        "type": 10
       },
       "revive_others": {
         "points_per_revive": 25,
         "description": "Points for reviving teammates",
-        "source_field": "revived_others"
+        "source_field": "revived_others",
+        "type": 11
       },
       "defibrillator_used": {
         "points_per_defib": 30,
         "description": "Points for using defibrillator",
-        "source_field": "defibs_used"
+        "source_field": "defibs_used",
+        "type": 12
       },
       "teammate_save": {
         "points_per_save": 10,
@@ -79,38 +91,44 @@
         "calculation": "special_kills * save_ratio",
         "save_ratio": 0.3,
         "source_field": "kills_all_specials",
-        "enabled": true
+        "enabled": true,
+        "type": 22
       },
       "ammo_pack_deploy": {
         "points_per_pack": 20,
         "description": "Points for deploying ammo packs",
         "source_field": "packs_used",
         "enabled": true,
-        "note": "Field 'packs_used' not available in database schema"
+        "note": "Field 'packs_used' not available in database schema",
+        "type": 13
       },
       "finale_completion": {
         "points_per_finale": 3000,
         "description": "Bonus points for completing finale",
-        "source_field": "finales_won"
+        "source_field": "finales_won",
+        "type": 1
       },
       "melee_kills": {
         "points_per_kill": 1,
         "description": "Points per melee kill",
-        "source_field": "melee_kills"
+        "source_field": "melee_kills",
+        "type": 15
       },
       "molotov_damage": {
         "points_per_damage": 0.05,
         "description": "Points per molotov damage",
         "source_field": "damage_molotov",
         "enabled": false,
-        "note": "Field 'damage_molotov' not available in database schema"
+        "note": "Field 'damage_molotov' not available in database schema",
+        "type": 18
       },
       "pipe_bomb_kills": {
         "points_per_kill": 3,
         "description": "Points per pipe bomb kill",
         "source_field": "kills_pipe",
         "enabled": false,
-        "note": "Field 'kills_pipe' not available in database schema"
+        "note": "Field 'kills_pipe' not available in database schema",
+        "type": 19
       },
       "heal_teammate_critical": {
         "points_per_heal": 60,
@@ -119,67 +137,78 @@
         "critical_ratio": 0.2,
         "source_field": "heal_others",
         "enabled": false,
-        "note": "Critical heals not tracked separately"
+        "note": "Critical heals not tracked separately",
+        "type": 10
       },
       "molotov_use": {
         "points_per_use": 5,
         "description": "Points for using molotov",
         "source_field": "pickups_molotov",
-        "enabled": true
+        "enabled": true,
+        "type": 18
       },
       "pipe_use": {
         "points_per_use": 5,
         "description": "Points for using pipe bomb",
         "source_field": "pickups_pipe_bomb",
-        "enabled": true
+        "enabled": true,
+        "type": 19
       },
       "bile_use": {
         "points_per_use": 5,
         "description": "Points for using bile bomb",
         "enabled": false,
+        "type": 20,
         "note": "Not tracked in current system"
       },
       "pill_use": {
         "points_per_use": 10,
         "description": "Points for using pills",
         "source_field": "pills_used",
-        "enabled": true
+        "enabled": true,
+        "type": 16
       },
       "adrenaline_use": {
         "points_per_use": 15,
         "description": "Points for using adrenaline",
         "source_field": "adrenaline_used",
-        "enabled": true
+        "enabled": true,
+        "type": 17
       },
       "clear_pinned_teammates": {
         "points_per_clear": 15,
         "description": "Points for clearing pinned teammates",
         "source_field": "cleared_pinned",
-        "enabled": true
+        "enabled": true,
+        "type": 22
       },
       "smoker_self_clear": {
         "points_per_clear": 10,
         "description": "Points for self-clearing from smokers",
         "source_field": "smokers_selfcleared",
-        "enabled": true
+        "enabled": true,
+        "type": 23
       },
       "hunter_deadstop": {
         "points_per_deadstop": 20,
         "description": "Points for deadstopping hunters",
         "source_field": "hunters_deadstopped",
-        "enabled": true
+        "enabled": true,
+        "type": 24
       },
       "witch_crown_angry": {
         "points_per_crown": 35,
         "description": "Bonus points for crowning angry witches",
         "source_field": "witches_crowned_angry",
-        "enabled": true
+        "enabled": true,
+        "type": 14
       },
       "boomer_bile_hits": {
         "points_per_hit": 3,
         "description": "Points for boomer bile hits on enemies",
         "source_field": "boomer_mellos",
-        "enabled": true
+        "enabled": true,
+        "type": 25
       }
     }
   },
@@ -190,55 +219,64 @@
       "friendly_fire_damage": {
         "points_per_damage": -30,
         "description": "Penalty per HP damage dealt to teammates",
-        "source_field": "survivor_ff"
+        "source_field": "survivor_ff",
+        "type": 9
       },
       "teammate_kills": {
         "points_per_kill": -500,
         "description": "Heavy penalty for killing teammates",
         "source_field": "ff_kills",
-        "enabled": true
+        "enabled": true,
+        "type": 32
       },
       "deaths": {
         "points_per_death": -10,
         "description": "Penalty for dying",
         "source_field": "survivor_deaths",
-        "enabled": true
+        "enabled": true,
+        "type": 26
       },
       "car_alarms_triggered": {
         "points_per_alarm": -10,
         "description": "Penalty for triggering car alarms",
         "source_field": "caralarms_activated",
-        "enabled": false
+        "enabled": false,
+        "type": 27
       },
       "times_pinned_penalty": {
         "points_per_pin": -5,
         "description": "Penalty for getting pinned by special infected",
         "source_field": "times_pinned",
-        "enabled": true
+        "enabled": true,
+        "type": 28
       },
       "tank_rocks_hit": {
         "points_per_hit": -10,
         "description": "Penalty for getting hit by tank rocks",
         "source_field": "rocks_hitby",
-        "enabled": true
+        "enabled": true,
+        "type": 29
       },
       "clown_honks": {
         "points_per_honk": -5,
         "description": "Penalty for honking clowns",
         "source_field": "clowns_honked",
-        "enabled": true
+        "enabled": true,
+        "type": 30
       },
       "idle_time_penalty": {
         "points_per_minute": -2,
         "description": "Penalty for idle time",
         "source_field": "minutes_idle",
-        "enabled": false
+        "enabled": false,
+        "type": null
       },
       "boomer_bile_self": {
         "points_per_bile": -5,
         "description": "Penalty for getting biled by boomer",
         "source_field": "boomer_mellos_self",
-        "enabled": true
+        "enabled": true,
+        "type": 31
       }
     }
   },
