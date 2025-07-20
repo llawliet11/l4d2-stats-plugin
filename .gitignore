@@ -20,3 +20,5 @@ backups/
 
 # some script allowed
 !build-once.sh
+
+.augment
