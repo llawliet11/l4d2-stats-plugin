@@ -38,7 +38,17 @@
                 @click="recalculatePoints"
                 :loading="recalculating"
               >
-                Recalculate
+                Quick Recalculate
+              </b-button>
+            </b-navbar-item>
+            <b-navbar-item>
+              <b-button
+                type="is-primary"
+                size="is-small"
+                @click="showAdvancedRecalculate"
+                :disabled="recalculating"
+              >
+                Advanced
               </b-button>
             </b-navbar-item>
             <b-navbar-item>
@@ -78,7 +88,12 @@
 </template>
 
 <script>
+import RecalculateModal from './components/admin/RecalculateModal.vue'
+
 export default {
+  components: {
+    RecalculateModal
+  },
   computed: {
     title() {
       return process.env.VUE_APP_SITE_NAME
@@ -167,6 +182,20 @@ export default {
       } finally {
         this.recalculating = false
       }
+    },
+    showAdvancedRecalculate() {
+      this.$buefy.modal.open({
+        parent: this,
+        component: RecalculateModal,
+        hasModalCard: true,
+        customClass: 'custom-modal',
+        trapFocus: true,
+        events: {
+          success: (result) => {
+            console.log('Advanced recalculation completed:', result)
+          }
+        }
+      })
     }
   }
 }

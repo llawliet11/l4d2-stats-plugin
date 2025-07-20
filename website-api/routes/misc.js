@@ -4,6 +4,7 @@ import routeCache from 'route-cache'
 import fs from 'fs'
 import path from 'path'
 import PointCalculator from '../services/PointCalculator.js'
+import PointTransactionUpdater from '../services/PointTransactionUpdater.js'
 import { addKillsAllSpecials } from '../utils/dataHelpers.js'
 
 export default function(pool) {
@@ -338,10 +339,50 @@ export default function(pool) {
     router.post('/recalculate', async(req,res) => {
         try {
             console.log('[/api/recalculate] Starting point recalculation...');
-            
+
+            // Parse request options
+            const {
+                mode = 'full',
+                update_transactions = false,
+                backup_original = true,
+                user_filter = null,
+                dry_run = false,
+                force_version_update = true
+            } = req.body;
+
+            console.log('[/api/recalculate] Options:', { mode, update_transactions, backup_original, user_filter, dry_run, force_version_update });
+
             // Initialize point calculator with new system
             const pointCalculator = new PointCalculator();
             console.log('[/api/recalculate] Loaded point system configuration');
+
+            let transactionUpdateStats = null;
+
+            // Step 1: Update point transactions if requested
+            if (update_transactions) {
+                console.log('[/api/recalculate] Starting point transaction updates...');
+                const transactionUpdater = new PointTransactionUpdater(pool);
+
+                const updateResult = await transactionUpdater.updatePointTransactions({
+                    userFilter: user_filter,
+                    backupOriginal: backup_original,
+                    dryRun: dry_run,
+                    batchSize: 1000,
+                    forceVersionUpdate: force_version_update
+                });
+
+                if (!updateResult.success) {
+                    return res.status(500).json({
+                        success: false,
+                        error: 'Failed to update point transactions',
+                        message: updateResult.error,
+                        stats: updateResult.stats
+                    });
+                }
+
+                transactionUpdateStats = updateResult.stats;
+                console.log('[/api/recalculate] Point transaction updates completed:', transactionUpdateStats);
+            }
             
             // Note: kills_all_specials column has been dropped from database
             // It will be calculated on-the-fly in API responses
@@ -485,16 +526,26 @@ export default function(pool) {
 
             console.log('[/api/recalculate] Recalculation completed successfully');
 
+            // Prepare response message
+            let message = 'Points recalculated successfully for both overall and map-specific statistics';
+            if (transactionUpdateStats) {
+                message += `. Point transactions updated: ${transactionUpdateStats.updated_transactions} changed, ${transactionUpdateStats.unchanged_transactions} unchanged`;
+                if (transactionUpdateStats.version_updated_transactions > 0) {
+                    message += `, ${transactionUpdateStats.version_updated_transactions} version-only updates`;
+                }
+            }
+
             res.json({
                 success: true,
-                message: 'Points recalculated successfully for both overall and map-specific statistics',
+                message: message,
                 stats: {
                     users_processed: processedCount,
                     total_points_calculated: totalPointsCalculated,
                     map_users_processed: mapProcessedCount,
                     total_map_points_calculated: totalMapPointsCalculated,
                     overall_stats: finalStats[0],
-                    map_stats: finalMapStats[0]
+                    map_stats: finalMapStats[0],
+                    transaction_updates: transactionUpdateStats
                 }
             });
             
@@ -504,6 +555,106 @@ export default function(pool) {
                 success: false,
                 error: 'Failed to recalculate points',
                 message: err.message
+            });
+        }
+    });
+
+    // Point transaction update endpoint (for testing and manual updates)
+    router.post('/point-transactions/update', async(req, res) => {
+        try {
+            const {
+                user_filter = null,
+                backup_original = true,
+                dry_run = false,
+                batch_size = 1000,
+                force_version_update = true
+            } = req.body;
+
+            console.log('[/api/point-transactions/update] Starting point transaction update...');
+            console.log('[/api/point-transactions/update] Options:', { user_filter, backup_original, dry_run, batch_size, force_version_update });
+
+            const transactionUpdater = new PointTransactionUpdater(pool);
+
+            // Get current stats before update
+            const beforeStats = await transactionUpdater.getTransactionStats(user_filter);
+
+            // Perform the update
+            const updateResult = await transactionUpdater.updatePointTransactions({
+                userFilter: user_filter,
+                backupOriginal: backup_original,
+                dryRun: dry_run,
+                batchSize: batch_size,
+                forceVersionUpdate: force_version_update
+            });
+
+            if (!updateResult.success) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to update point transactions',
+                    message: updateResult.error,
+                    stats: updateResult.stats
+                });
+            }
+
+            // Get stats after update
+            const afterStats = await transactionUpdater.getTransactionStats(user_filter);
+
+            res.json({
+                success: true,
+                message: dry_run ? 'Dry run completed - no changes made' : 'Point transactions updated successfully',
+                dry_run: dry_run,
+                before_stats: beforeStats,
+                after_stats: afterStats,
+                update_stats: updateResult.stats
+            });
+
+        } catch (error) {
+            console.error('[/api/point-transactions/update] Error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update point transactions',
+                message: error.message
+            });
+        }
+    });
+
+    // Point transaction statistics endpoint
+    router.get('/point-transactions/stats', async(req, res) => {
+        try {
+            const { user_filter = null } = req.query;
+
+            const transactionUpdater = new PointTransactionUpdater(pool);
+            const stats = await transactionUpdater.getTransactionStats(user_filter);
+
+            // Get type distribution
+            const typeQuery = `
+                SELECT
+                    type,
+                    COUNT(*) as count,
+                    SUM(amount) as total_points,
+                    AVG(amount) as avg_points,
+                    COUNT(CASE WHEN original_amount IS NOT NULL THEN 1 END) as backed_up_count
+                FROM stats_points
+                ${user_filter ? 'WHERE steamid = ?' : ''}
+                GROUP BY type
+                ORDER BY type
+            `;
+
+            const [typeDistribution] = await pool.execute(typeQuery, user_filter ? [user_filter] : []);
+
+            res.json({
+                success: true,
+                overall_stats: stats,
+                type_distribution: typeDistribution,
+                user_filter: user_filter
+            });
+
+        } catch (error) {
+            console.error('[/api/point-transactions/stats] Error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to get transaction statistics',
+                message: error.message
             });
         }
     });
