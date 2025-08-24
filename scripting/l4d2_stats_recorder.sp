@@ -372,13 +372,27 @@ enum struct Player {
 	}
 
 	void RecordPoint(PointRecordType type, int amount = 1) {
-		this.points += amount;
-		
-		// STEAM ID-CENTRIC: Only proceed if we have a valid Steam ID
+		// CRITICAL: Validate Steam ID before any point operations
 		if(strlen(this.steamid) < 8 || StrContains(this.steamid, "STEAM_") != 0) {
 			LogError("[l4d2_stats_recorder] CRITICAL: RecordPoint called with invalid Steam ID: '%s' - points may be lost!", this.steamid);
 			return; // Protect against corrupted data
 		}
+		
+		// FIXED: Prevent integer overflow for points
+		int newPoints = this.points + amount;
+		
+		// Check for overflow (MySQL INT range: -2,147,483,648 to 2,147,483,647)
+		if(amount > 0 && newPoints < this.points) {
+			// Positive overflow
+			LogError("[l4d2_stats_recorder] Points overflow prevented for %s: %d + %d would overflow", this.steamid, this.points, amount);
+			newPoints = 2147483647; // Cap at max INT value
+		} else if(amount < 0 && newPoints > this.points) {
+			// Negative overflow
+			LogError("[l4d2_stats_recorder] Points underflow prevented for %s: %d + %d would underflow", this.steamid, this.points, amount);
+			newPoints = -2147483648; // Cap at min INT value
+		}
+		
+		this.points = newPoints;
 		
 		PrintToServer("[l4d2_stats_recorder] RecordPoint: %s earned %d points (type: %d), total: %d", this.steamid, amount, type, this.points);
 		
@@ -641,6 +655,12 @@ public void OnClientAuthorized(int client, const char[] auth) {
 	PrintToServer("[l4d2_stats_recorder] OnClientAuthorized: client=%d, auth='%s'", client, auth);
 	
 	if(client > 0 && !IsFakeClient(client)) {
+		// ENHANCED: Additional validation for auth string
+		if(strlen(auth) < 8 || StrContains(auth, "STEAM_") != 0) {
+			PrintToServer("[l4d2_stats_recorder] Invalid auth string for client %d: '%s' - waiting for proper authorization", client, auth);
+			return;
+		}
+		
 		char steamid[32];
 		strcopy(steamid, sizeof(steamid), auth);
 		PrintToServer("[l4d2_stats_recorder] Processing authorization for %N (client %d)", client, client);
@@ -652,6 +672,24 @@ public void OnClientAuthorized(int client, const char[] auth) {
 			PrintToServer("[l4d2_stats_recorder] OnClientAuthorized: Client %d is fake client (bot), skipping", client);
 		}
 	}
+}
+
+// NEW: Timer callback to retry user setup for pending Steam IDs
+public Action Timer_RetryUserSetup(Handle timer, int userid) {
+	int client = GetClientOfUserId(userid);
+	if(client > 0 && IsClientInGame(client) && !IsFakeClient(client)) {
+		char steamid[32];
+		GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid));
+		
+		// Check if Steam ID is now valid
+		if(strlen(steamid) >= 8 && StrContains(steamid, "STEAM_") == 0 && !StrEqual(steamid, "STEAM_ID_PENDING")) {
+			PrintToServer("[l4d2_stats_recorder] Retrying user setup for %N with Steam ID: %s", client, steamid);
+			SetupUserInDB(client, steamid);
+		} else {
+			PrintToServer("[l4d2_stats_recorder] Steam ID still not ready for %N: '%s'", client, steamid);
+		}
+	}
+	return Plugin_Stop;
 }
 public void OnClientPutInServer(int client) {
 	if(!IsFakeClient(client)) {
@@ -754,10 +792,15 @@ bool ConnectDB() {
 //Setups a user, this tries to fetch user by steamid
 void SetupUserInDB(int client, const char steamid[32]) {
 	if(client > 0 && !IsFakeClient(client)) {
-		// Validate Steam ID format
-		if(strlen(steamid) < 8 || StrContains(steamid, "STEAM_") != 0) {
-			LogError("[l4d2_stats_recorder] Invalid Steam ID format for client %d: '%s'", client, steamid);
-			PrintToServer("[l4d2_stats_recorder] ERROR: Invalid Steam ID format for %N: '%s'", client, steamid);
+		// ENHANCED: More robust Steam ID validation
+		if(strlen(steamid) < 8 || StrContains(steamid, "STEAM_") != 0 || StrEqual(steamid, "STEAM_ID_PENDING") || StrEqual(steamid, "STEAM_ID_LAN")) {
+			LogError("[l4d2_stats_recorder] Invalid/Pending Steam ID for client %d: '%s' - deferring setup", client, steamid);
+			PrintToServer("[l4d2_stats_recorder] Deferring user setup for %N - Steam ID not ready: '%s'", client, steamid);
+			
+			// Defer setup with a timer for pending Steam IDs
+			if(StrEqual(steamid, "STEAM_ID_PENDING")) {
+				CreateTimer(2.0, Timer_RetryUserSetup, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+			}
 			return;
 		}
 		
@@ -796,7 +839,7 @@ void IncrementStat(int client, const char[] name, int amount = 1, bool lowPriori
 			char[] escaped_name = new char[escaped_name_size];
 			char query[255];
 			g_db.Escape(name, escaped_name, escaped_name_size);
-			Format(query, sizeof(query), "UPDATE stats_users SET `%s`=`%s`+%d WHERE steamid='%s'", escaped_name, escaped_name, amount, players[client].steamid);
+            Format(query, sizeof(query), "UPDATE stats_users SET `stats_users`.`%s`=`stats_users`.`%s`+%d WHERE steamid='%s'", escaped_name, escaped_name, amount, players[client].steamid);
 			#if defined DEBUG
 			PrintToServer("[Debug] Updating Stat %s (+%d) for %N (%d) [%s]", name, amount, client, client, players[client].steamid);
 			#endif 
@@ -823,10 +866,10 @@ void InitializeMapSession(int client) {
 				"SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, NULL " ...
 				"FROM stats_users WHERE steamid = '%s' " ...
 				"ON DUPLICATE KEY UPDATE " ...
-				"session_start = LEAST(session_start, %d), " ...
-				"session_end = NULL, " ...
-				"last_alias = VALUES(last_alias), " ...
-				"last_join_date = VALUES(last_join_date)",
+				"`stats_map_users`.`session_start` = LEAST(`stats_map_users`.`session_start`, %d), " ...
+				"`stats_map_users`.`session_end` = NULL, " ...
+				"`stats_map_users`.`last_alias` = VALUES(last_alias), " ...
+				"`stats_map_users`.`last_join_date` = VALUES(last_join_date)",
 				players[client].steamid, game.mapId, players[client].mapSessionStart, players[client].steamid,
 				players[client].mapSessionStart);
 
@@ -851,7 +894,7 @@ void FinalizeMapSession(int client) {
 
 			// Update session_end timestamp for the current map session
 			Format(query, sizeof(query),
-				"UPDATE stats_map_users SET session_end = UNIX_TIMESTAMP() " ...
+				"UPDATE stats_map_users SET `stats_map_users`.`session_end` = UNIX_TIMESTAMP() " ...
 				"WHERE steamid = '%s' AND mapid = '%s'",
 				players[client].steamid, game.mapId);
 
@@ -877,24 +920,40 @@ void IncrementMapStat(int client, const char[] name, int amount = 1, bool lowPri
 				LogError("Database handle is invalid.");
 				return;
 			}
-			int escaped_name_size = 2*strlen(name)+1;
-			char[] escaped_name = new char[escaped_name_size];
-			char query[1024];
-			g_db.Escape(name, escaped_name, escaped_name_size);
+            int escaped_name_size = 2*strlen(name)+1;
+            char[] escaped_name = new char[escaped_name_size];
+            char query[1400];
+            g_db.Escape(name, escaped_name, escaped_name_size);
 
-			// UPSERT: Insert new record or update existing cumulative stats
-			// Uses composite primary key (steamid, mapid) for cumulative tracking
-			Format(query, sizeof(query),
-				"INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, %s, session_end) " ...
-				"SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, %d, UNIX_TIMESTAMP() " ...
-				"FROM stats_users WHERE steamid = '%s' " ...
-				"ON DUPLICATE KEY UPDATE " ...
-				"%s = %s + %d, " ...
-				"session_end = UNIX_TIMESTAMP(), " ...
-				"last_alias = VALUES(last_alias), " ...
-				"last_join_date = VALUES(last_join_date)",
-				escaped_name, players[client].steamid, game.mapId, players[client].mapSessionStart, amount, players[client].steamid,
-				escaped_name, escaped_name, amount);
+            // Ensure map_info row exists to satisfy foreign key on stats_map_users.
+            // Use a synchronous fast query so the row exists before the UPSERT.
+            {
+                int escaped_mapid_size = 2*strlen(game.mapId)+1;
+                char[] escaped_mapid = new char[escaped_mapid_size];
+                char escaped_maptitle[256];
+                g_db.Escape(game.mapId, escaped_mapid, escaped_mapid_size);
+                g_db.Escape(game.mapTitle, escaped_maptitle, sizeof(escaped_maptitle));
+                char ensureMapQuery[512];
+                g_db.Format(ensureMapQuery, sizeof(ensureMapQuery), "INSERT IGNORE INTO map_info (mapid, name, chapter_count) VALUES ('%s','%s',%d)", escaped_mapid, escaped_maptitle, L4D_GetMaxChapters());
+                SQL_LockDatabase(g_db);
+                SQL_FastQuery(g_db, ensureMapQuery);
+                SQL_UnlockDatabase(g_db);
+            }
+
+            // UPSERT: Insert new record or update existing cumulative stats
+            // Uses composite primary key (steamid, mapid) for cumulative tracking
+            // Qualify the target table columns in the UPDATE clause to avoid ambiguity
+            Format(query, sizeof(query),
+                "INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, %s, session_end) " ...
+                "SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, %d, UNIX_TIMESTAMP() " ...
+                "FROM stats_users WHERE steamid = '%s' " ...
+                "ON DUPLICATE KEY UPDATE " ...
+                "`stats_map_users`.`%s` = `stats_map_users`.`%s` + %d, " ...
+                "session_end = UNIX_TIMESTAMP(), " ...
+                "last_alias = VALUES(last_alias), " ...
+                "last_join_date = VALUES(last_join_date)",
+                escaped_name, players[client].steamid, game.mapId, players[client].mapSessionStart, amount, players[client].steamid,
+                escaped_name, escaped_name, amount);
 
 			#if defined DEBUG
 			PrintToServer("[Debug] UPSERT Map Stat %s (+%d) for %N on map %s [%s]", name, amount, client, game.mapId, players[client].steamid);
@@ -1031,7 +1090,7 @@ void FlushQueuedStats(int client, bool disconnect) {
 	   players[client].damageSurvivorGiven > 0 ||
 	   players[client].doorOpens > 0) {
 		char query[1023];
-		Format(query, sizeof(query), "UPDATE stats_users SET survivor_damage_give=survivor_damage_give+%d,survivor_damage_rec=survivor_damage_rec+%d, infected_damage_give=infected_damage_give+%d,infected_damage_rec=infected_damage_rec+%d,survivor_ff=survivor_ff+%d,survivor_ff_rec=survivor_ff_rec+%d,common_kills=common_kills+%d,common_headshots=common_headshots+%d,melee_kills=melee_kills+%d,door_opens=door_opens+%d,damage_to_tank=damage_to_tank+%d, damage_witch=damage_witch+%d,minutes_played=minutes_played+%d, kills_witch=kills_witch+%d,points=%d,packs_used=packs_used+%d,damage_molotov=damage_molotov+%d,kills_molotov=kills_molotov+%d,kills_pipe=kills_pipe+%d,kills_minigun=kills_minigun+%d,clowns_honked=clowns_honked+%d,total_distance_travelled=total_distance_travelled+%d WHERE steamid='%s'",
+            Format(query, sizeof(query), "UPDATE stats_users SET survivor_damage_give=survivor_damage_give+%d,survivor_damage_rec=survivor_damage_rec+%d, infected_damage_give=infected_damage_give+%d,infected_damage_rec=infected_damage_rec+%d,survivor_ff=survivor_ff+%d,survivor_ff_rec=survivor_ff_rec+%d,common_kills=common_kills+%d,common_headshots=common_headshots+%d,melee_kills=melee_kills+%d,door_opens=door_opens+%d,damage_to_tank=damage_to_tank+%d, damage_witch=damage_witch+%d,minutes_played=minutes_played+%d, kills_witch=kills_witch+%d,points=GREATEST(0,%d),packs_used=packs_used+%d,damage_molotov=damage_molotov+%d,kills_molotov=kills_molotov+%d,kills_pipe=kills_pipe+%d,kills_minigun=kills_minigun+%d,clowns_honked=clowns_honked+%d,total_distance_travelled=total_distance_travelled+%d WHERE steamid='%s'",
 			//VARIABLE													//COLUMN NAME
 
 			players[client].damageSurvivorGiven, 						//survivor_damage_give
