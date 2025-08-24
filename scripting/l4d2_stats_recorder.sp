@@ -372,8 +372,9 @@ enum struct Player {
 	}
 
 	void RecordPoint(PointRecordType type, int amount = 1) {
-		// CRITICAL: Validate Steam ID before any point operations
-		if(strlen(this.steamid) < 8 || StrContains(this.steamid, "STEAM_") != 0) {
+		// Enhanced Steam ID validation with additional format checks
+		if(strlen(this.steamid) < 8 || StrContains(this.steamid, "STEAM_") != 0 || 
+		   StrContains(this.steamid, ":") == -1 || strlen(this.steamid) > 32) {
 			LogError("[l4d2_stats_recorder] CRITICAL: RecordPoint called with invalid Steam ID: '%s' - points may be lost!", this.steamid);
 			return; // Protect against corrupted data
 		}
@@ -655,8 +656,10 @@ public void OnClientAuthorized(int client, const char[] auth) {
 	PrintToServer("[l4d2_stats_recorder] OnClientAuthorized: client=%d, auth='%s'", client, auth);
 	
 	if(client > 0 && !IsFakeClient(client)) {
-		// ENHANCED: Additional validation for auth string
-		if(strlen(auth) < 8 || StrContains(auth, "STEAM_") != 0) {
+		// ENHANCED: Comprehensive Steam ID format validation
+		if(strlen(auth) < 8 || StrContains(auth, "STEAM_") != 0 || 
+		   StrContains(auth, ":") == -1 || strlen(auth) > 32 ||
+		   StrContains(auth, "PENDING") != -1 || StrContains(auth, "UNKNOWN") != -1) {
 			PrintToServer("[l4d2_stats_recorder] Invalid auth string for client %d: '%s' - waiting for proper authorization", client, auth);
 			return;
 		}
@@ -857,10 +860,24 @@ void InitializeMapSession(int client) {
 				return;
 			}
 
-			char query[1024];
+				char query[1024];
 
-			// Initialize or update map session record with current session start time
-			// This ensures the record exists for cumulative statistics
+				// Ensure the map exists in `map_info` to satisfy the foreign key on `stats_map_users`.
+				{
+					int escaped_mapid_size = 2*strlen(game.mapId)+1;
+					char[] escaped_mapid = new char[escaped_mapid_size];
+					char escaped_maptitle[256];
+					g_db.Escape(game.mapId, escaped_mapid, escaped_mapid_size);
+					g_db.Escape(game.mapTitle, escaped_maptitle, sizeof(escaped_maptitle));
+					char ensureMapQuery[512];
+					g_db.Format(ensureMapQuery, sizeof(ensureMapQuery), "INSERT IGNORE INTO map_info (mapid, name, chapter_count) VALUES ('%s','%s',%d)", escaped_mapid, escaped_maptitle, L4D_GetMaxChapters());
+					SQL_LockDatabase(g_db);
+					SQL_FastQuery(g_db, ensureMapQuery);
+					SQL_UnlockDatabase(g_db);
+				}
+
+				// Initialize or update map session record with current session start time
+				// This ensures the record exists for cumulative statistics
 			Format(query, sizeof(query),
 				"INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, session_end) " ...
 				"SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, NULL " ...
@@ -1114,9 +1131,9 @@ void FlushQueuedStats(int client, bool disconnect) {
 			players[client].molotovKills,								//kills_molotov
 			players[client].minigunKills,								//kills_minigun
 			players[client].clownsHonked,								//clowns_honked
-			players[client].distance.accumulation,						//total_distance_travelled
-			players[client].steamid[0]
-		);
+            			players[client].distance.accumulation,						//total_distance_travelled
+            			players[client].steamid
+			);
 		
 		//If disconnected, can't put on another thread for some reason: Push it out fast
 		PrintToServer("[l4d2_stats_recorder] Flushing stats for %N (SteamID: %s, Points: %d, Queue size: %d)", 
@@ -1143,8 +1160,9 @@ void SubmitPoints(int client) {
 		return;
 	}
 	
-	// Validate Steam ID before submitting
-	if(strlen(players[client].steamid) < 8 || StrContains(players[client].steamid, "STEAM_") != 0) {
+	// Enhanced Steam ID validation before submitting
+	if(strlen(players[client].steamid) < 8 || StrContains(players[client].steamid, "STEAM_") != 0 || 
+	   StrContains(players[client].steamid, ":") == -1 || strlen(players[client].steamid) > 32) {
 		LogError("[l4d2_stats_recorder] Invalid Steam ID for client %d: '%s'. Points not submitted.", client, players[client].steamid);
 		return;
 	}
@@ -1559,9 +1577,10 @@ void DBCT_EnsureUserExists(Handle db, Handle child, const char[] error, int user
 		// CRITICAL: Also update total points in stats_users table immediately
 		// This ensures leaderboards show current points, not just game-end totals
 		char updateQuery[256];
-		Format(updateQuery, sizeof(updateQuery), 
-			"UPDATE stats_users SET points=%d WHERE steamid='%s'",
-			players[client].points, players[client].steamid);
+            // Clamp points in SQL to avoid MySQL out-of-range errors
+            Format(updateQuery, sizeof(updateQuery), 
+                "UPDATE stats_users SET points=LEAST(GREATEST(%d, -2147483648), 2147483647) WHERE steamid='%s'",
+                players[client].points, players[client].steamid);
 		SQL_TQuery(g_db, DBCT_UpdateTotalPoints, updateQuery, GetClientUserId(client));
 	}
 }
