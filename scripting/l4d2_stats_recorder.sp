@@ -557,7 +557,7 @@ public void OnPluginStart() {
 public void OnPluginEnd() {
 	for(int i=1; i<=MaxClients;i++) {
 		if(IsClientInGame(i) && !IsFakeClient(i) && players[i].steamid[0]) {
-			FlushQueuedStats(i, false);
+			// FlushQueuedStats(i, false); // REMOVED: Only push points at round end
 		}
 	}
 	ClearHeatMapEntities();
@@ -744,7 +744,7 @@ public void OnClientDisconnect(int client) {
 			}
 		}
 
-		FlushQueuedStats(client, true);
+		// FlushQueuedStats(client, true); // REMOVED: Only push points at round end, not on disconnect
 
 		// Finalize map session on disconnect
 		FinalizeMapSession(client);
@@ -2384,13 +2384,13 @@ public void Event_VersusRoundStart(Event event, const char[] name, bool dontBroa
 public void Event_MapTransition(Event event, const char[] name, bool dontBroadcast) {
 	isTransition = true;
 	for(int i = 1; i <= MaxClients; i++) {
-		// CRITICAL FIX: Process ALL survivor team players, dead or alive
-		// Dead players also need their points submitted during map transitions!
+		// Only increment session stats, do not flush points during map transitions
+		// Points will only be pushed at round end
 		if(IsClientInGame(i) && GetClientTeam(i) == 2 && !IsFakeClient(i)) {
 			bool isAlive = IsPlayerAlive(i);
-			PrintToServer("[l4d2_stats_recorder] Map transition - flushing stats for %N (alive: %s)", i, isAlive ? "yes" : "no");
+			PrintToServer("[l4d2_stats_recorder] Map transition - incrementing session for %N (alive: %s)", i, isAlive ? "yes" : "no");
 			IncrementSessionStat(i);
-			FlushQueuedStats(i, false);
+			// FlushQueuedStats(i, false); // REMOVED: Only push points at round end
 		}
 	}
 }
