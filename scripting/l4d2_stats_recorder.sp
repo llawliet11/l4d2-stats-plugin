@@ -6,7 +6,6 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <geoip>
 #include <sdkhooks>
 #include <left4dhooks>
 #include <jutils>
@@ -407,13 +406,15 @@ enum struct Player {
 		
 		this.points = newPoints;
 		
-		PrintToServer("[l4d2_stats_recorder] RecordPoint: %s earned %d points (type: %d), total: %d", this.steamid, amount, type, this.points);
+		// Debug logging removed to improve performance (was causing lag with frequent skill events)
+		// PrintToServer("[l4d2_stats_recorder] RecordPoint: %s earned %d points (type: %d), total: %d", this.steamid, amount, type, this.points);
 		
 		// Queue ALL point types for database submission (including common kills)
 		int index = this.pointsQueue.Push(type);
 		this.pointsQueue.Set(index, amount, 1);
 		this.pointsQueue.Set(index, GetTime(), 2);
-		PrintToServer("[l4d2_stats_recorder] Queued point record: type=%d, amount=%d, queue size=%d", type, amount, this.pointsQueue.Length);
+		// Debug logging removed to improve performance (was causing lag with frequent skill events)
+		// PrintToServer("[l4d2_stats_recorder] Queued point record: type=%d, amount=%d, queue size=%d", type, amount, this.pointsQueue.Length);
 	}
 
 	void MeasureDistance(int client) {
@@ -1427,10 +1428,10 @@ public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[]
 	int client = GetClientOfUserId(data); 
 	if(client == 0) return;
 	int alias_length = 2*MAX_NAME_LENGTH+1;
-	char alias[MAX_NAME_LENGTH], ip[40], country_name[45];
+	char alias[MAX_NAME_LENGTH];
 	char[] safe_alias = new char[alias_length];
 
-	//Get a SQL-safe player name, and their country and IP
+	//Get a SQL-safe player name
 	GetClientName(client, alias, sizeof(alias));
 	
 	// CRITICAL FIX: Never block user setup due to name issues - use fallback
@@ -1447,13 +1448,11 @@ public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[]
 		client, alias, strlen(alias), players[client].steamid);
 		
 	SQL_EscapeString(g_db, alias, safe_alias, alias_length);
-	GetClientIP(client, ip, sizeof(ip));
-	GeoipCountry(ip, country_name, sizeof(country_name));
 
 	char query[255]; 
 	if(results.RowCount == 0) {
 		//user does not exist in db, create now
-		Format(query, sizeof(query), "INSERT INTO `stats_users` (`steamid`, `last_alias`, `last_join_date`,`created_date`,`country`) VALUES ('%s', '%s', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), '%s')", players[client].steamid, safe_alias, country_name);
+		Format(query, sizeof(query), "INSERT INTO `stats_users` (`steamid`, `last_alias`, `last_join_date`,`created_date`,`country`) VALUES ('%s', '%s', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), '')", players[client].steamid, safe_alias);
 		g_db.Query(DBCT_Generic, query, QUERY_UPDATE_USER);
 
 		Format(query, sizeof(query), "%N is joining for the first time", client);
@@ -1488,7 +1487,7 @@ public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[]
 		}
 		int connections_amount = lateLoaded ? 0 : 1;
 
-		Format(query, sizeof(query), "UPDATE `stats_users` SET `last_alias`='%s', `last_join_date`=UNIX_TIMESTAMP(), `country`='%s', connections=connections+%d WHERE `steamid`='%s'", safe_alias, country_name, connections_amount, players[client].steamid);
+		Format(query, sizeof(query), "UPDATE `stats_users` SET `last_alias`='%s', `last_join_date`=UNIX_TIMESTAMP(), `country`='', connections=connections+%d WHERE `steamid`='%s'", safe_alias, connections_amount, players[client].steamid);
 		g_db.Query(DBCT_Generic, query, QUERY_UPDATE_USER);
 		if(!StrEqual(prevName, alias)) {
 			// Add prev name to history - NON-BLOCKING: Name history is for display only
