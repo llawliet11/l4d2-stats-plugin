@@ -302,6 +302,7 @@ stock int GiveClientWeapon(int client, const char[] wpnName) {
 }
 stock int GetNearestEntity(int client, char[] classname)
 {
+	#pragma unused client
 	int nearestEntity = -1;
 	float clientVecOrigin[3], entityVecOrigin[3];
 	
@@ -862,6 +863,7 @@ stock void QueryPlayer(int client, MenuHandler handler, int flags = COMMAND_FILT
 	menu.Display(client, time);
 }
 stock bool IsNearGround(int ref, float distFromGround = 15.0) {
+	#pragma unused distFromGround
 	static float sPos[3], ePos[3];
 	GetEntPropVector(ref, Prop_Send, "m_vecOrigin", sPos);
 	ePos[0] = sPos[0];
@@ -874,7 +876,8 @@ stock bool IsNearGround(int ref, float distFromGround = 15.0) {
 	return false;
 }
 
-stock bool IsAreaClear(const float pos[3], const float ang[3], const float minBound[3], const float maxBound[3]) { 
+stock bool IsAreaClear(const float pos[3], const float ang[3], const float minBound[3], const float maxBound[3]) {
+	#pragma unused ang 
 
 	TR_TraceHullFilter(pos, pos, minBound, maxBound, MASK_SOLID, Filter_World);
 	if(TR_DidHit()) {

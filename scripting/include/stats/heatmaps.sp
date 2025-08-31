@@ -218,6 +218,7 @@ int CreateHeatMapVisual(HeatMapType type, float pos[3], int count) {
 }
 
 int CreateHeatMapEntity(HeatMapType type, float pos[3], int alpha = 255) {
+	#pragma unused type
 	PrecacheModel("models/props_fortifications/orange_cone001_reference.mdl");
 	int entity = CreateEntityByName("prop_dynamic");
 	if(entity == -1) return -1; 

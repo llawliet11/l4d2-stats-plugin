@@ -70,7 +70,8 @@ Menu g_rateMenu;
 int g_iTankDamage[MAXPLAYERS + 1];     // Per-tank damage tracking
 bool g_bTankInPlay = false;            // Is tank currently active
 int g_iTankClient = 0;                 // Current tank client ID
-int g_iTankHealth = 0;                 // Current tank health
+int g_iTankHealth;                     // Current tank health (used in DEBUG builds)
+#pragma unused g_iTankHealth
 #define ZOMBIECLASS_TANK 8             // Tank zombie class ID
 
 // Anti-abuse: Time-based heal cooldown system
