@@ -80,6 +80,21 @@ int g_iLastHealTime[MAXPLAYERS + 1][MAXPLAYERS + 1]; // [healer][target] - last 
 #define HEAL_HEALTH_THRESHOLD 60       // Only award points if target health <= 60%
 #define HEAL_CRITICAL_THRESHOLD 30     // Bonus points if target health <= 30%
 
+// PERFORMANCE OPTIMIZATION: Map-End Batch Database System
+#define EVENT_THROTTLE_THRESHOLD 50    // Max events per player per batch cycle
+#define DEBUG_SPAM_LIMIT 10            // Reduce debug spam
+
+// In-memory stat accumulators - only write to DB at map end
+StringMap g_hAccumulatedStats[MAXPLAYERS + 1];     // [client] -> StringMap of stat names to values
+StringMap g_hAccumulatedMapStats[MAXPLAYERS + 1];  // [client] -> StringMap of map stat names to values
+
+// Performance monitoring
+int g_iEventCounter[MAXPLAYERS + 1];   // Count events per player for throttling
+float g_fLastEventTime[MAXPLAYERS + 1]; // Last event time for rate limiting
+int g_iDebugSpamCounter;               // Debug spam counter
+#pragma unused g_iDebugSpamCounter
+int g_iTotalEventsThisMap = 0;         // Total events processed this map
+
 char OFFICIAL_MAP_NAMES[14][] = {
 	"Dead Center",   // c1
 	"Dark Carnival", // c2
@@ -542,6 +557,7 @@ public void OnPluginStart() {
 	RegAdminCmd("sm_heatmaps", Command_Heatmaps, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_heatmap", Command_Heatmaps, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_debug_points", Command_CheckPlayerPoints, ADMFLAG_GENERIC, "Debug player point recording status");
+	RegAdminCmd("sm_perf_stats", Command_PerformanceStats, ADMFLAG_GENERIC, "View performance statistics and accumulated stats");
 	RegConsoleCmd("sm_rate", Command_RateMap);
 
 	AutoExecConfig(true, "l4d2_stats_recorder");
@@ -550,6 +566,8 @@ public void OnPluginStart() {
 		players[i].Init();
 	}
 
+	// Initialize performance optimization system
+	InitializeBatchSystem();
 	
 	CreateTimer(hHeatmapInterval.FloatValue, Timer_HeatMapInterval, _, TIMER_REPEAT);
 	CreateTimer(DISTANCE_CALC_TIMER_INTERVAL, Timer_CalculateDistances, _, TIMER_REPEAT);
@@ -557,6 +575,10 @@ public void OnPluginStart() {
 
 //When plugin is being unloaded: flush all user's statistics.
 public void OnPluginEnd() {
+	// Flush any pending batch operations before shutdown
+	FlushAllAccumulatedStats();
+	ShutdownBatchSystem();
+	
 	for(int i=1; i<=MaxClients;i++) {
 		if(IsClientInGame(i) && !IsFakeClient(i) && players[i].steamid[0]) {
 			// FlushQueuedStats(i, false); // REMOVED: Only push points at round end
@@ -714,6 +736,11 @@ public void OnClientPutInServer(int client) {
 	}
 }
 public void OnClientDisconnect(int client) {
+	// PERFORMANCE: Flush individual player's accumulated stats on disconnect
+	if(!IsFakeClient(client) && players[client].steamid[0]) {
+		FlushClientAccumulatedStats(client);
+	}
+	
 	//Check if any pending stats to send.
 	if(!IsFakeClient(client) && IsClientInGame(client)) {
 		//Record campaign session, incase they leave early. 
@@ -721,7 +748,7 @@ public void OnClientDisconnect(int client) {
 		if(game.finished && game.uuid[0] && players[client].steamid[0]) {
 			IncrementSessionStat(client);
 			RecordCampaign(client);
-			IncrementBothStats(client, "finales_won", 1);
+			IncrementBothStatsOptimized(client, "finales_won", 1);
 			players[client].RecordPoint(PType_FinishCampaign, 1000);
 		}
 		
@@ -843,27 +870,7 @@ void SetupUserInDB(int client, const char steamid[32]) {
 		SQL_TQuery(g_db, DBCT_CheckUserExistance, query, GetClientUserId(client));
 	}
 }
-//Increments a statistic by X amount
-void IncrementStat(int client, const char[] name, int amount = 1, bool lowPriority = true) {
-	if(client > 0 && !IsFakeClient(client) && IsClientConnected(client)) {
-		//Only run if client valid client, AND has steamid. Not probably necessarily anymore.
-		if (players[client].steamid[0]) {
-			if(g_db == INVALID_HANDLE) {
-				LogError("Database handle is invalid.");
-				return;
-			}
-			int escaped_name_size = 2*strlen(name)+1;
-			char[] escaped_name = new char[escaped_name_size];
-			char query[255];
-			g_db.Escape(name, escaped_name, escaped_name_size);
-            Format(query, sizeof(query), "UPDATE stats_users SET `stats_users`.`%s`=`stats_users`.`%s`+%d WHERE steamid='%s'", escaped_name, escaped_name, amount, players[client].steamid);
-			#if defined DEBUG
-			PrintToServer("[Debug] Updating Stat %s (+%d) for %N (%d) [%s]", name, amount, client, client, players[client].steamid);
-			#endif 
-			SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, lowPriority ? DBPrio_Low : DBPrio_Normal);
-		}
-	}
-}
+// OLD FUNCTION - REPLACED BY OPTIMIZED VERSION
 
 //Initialize map session record for cumulative statistics tracking
 void InitializeMapSession(int client) {
@@ -938,61 +945,9 @@ void FinalizeMapSession(int client) {
 }
 
 //Increments both lifetime and map-specific statistics
-void IncrementBothStats(int client, const char[] name, int amount = 1, bool lowPriority = true) {
-	IncrementStat(client, name, amount, lowPriority);    // Lifetime stats
-	IncrementMapStat(client, name, amount, lowPriority); // Map-specific stats
-}
+// OLD FUNCTION - REPLACED BY OPTIMIZED VERSION
 
-//Increments a map-specific statistic for stats_map_users table
-void IncrementMapStat(int client, const char[] name, int amount = 1, bool lowPriority = true) {
-	if(client > 0 && !IsFakeClient(client) && IsClientConnected(client)) {
-		if (players[client].steamid[0] && EnsureMapIdExists() && players[client].mapSessionStart > 0) {
-			if(g_db == INVALID_HANDLE) {
-				LogError("Database handle is invalid.");
-				return;
-			}
-            int escaped_name_size = 2*strlen(name)+1;
-            char[] escaped_name = new char[escaped_name_size];
-            char query[1400];
-            g_db.Escape(name, escaped_name, escaped_name_size);
-
-            // Ensure map_info row exists to satisfy foreign key on stats_map_users.
-            // Use a synchronous fast query so the row exists before the UPSERT.
-            {
-                int escaped_mapid_size = 2*strlen(game.mapId)+1;
-                char[] escaped_mapid = new char[escaped_mapid_size];
-                char escaped_maptitle[256];
-                g_db.Escape(game.mapId, escaped_mapid, escaped_mapid_size);
-                g_db.Escape(game.mapTitle, escaped_maptitle, sizeof(escaped_maptitle));
-                char ensureMapQuery[512];
-                g_db.Format(ensureMapQuery, sizeof(ensureMapQuery), "INSERT IGNORE INTO map_info (mapid, name, chapter_count) VALUES ('%s','%s',%d)", escaped_mapid, escaped_maptitle, L4D_GetMaxChapters());
-                SQL_LockDatabase(g_db);
-                SQL_FastQuery(g_db, ensureMapQuery);
-                SQL_UnlockDatabase(g_db);
-            }
-
-            // UPSERT: Insert new record or update existing cumulative stats
-            // Uses composite primary key (steamid, mapid) for cumulative tracking
-            // Qualify the target table columns in the UPDATE clause to avoid ambiguity
-            Format(query, sizeof(query),
-                "INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, %s, session_end) " ...
-                "SELECT '%s', '%s', %d, last_alias, last_join_date, created_date, country, %d, UNIX_TIMESTAMP() " ...
-                "FROM stats_users WHERE steamid = '%s' " ...
-                "ON DUPLICATE KEY UPDATE " ...
-                "`stats_map_users`.`%s` = `stats_map_users`.`%s` + %d, " ...
-                "session_end = UNIX_TIMESTAMP(), " ...
-                "last_alias = VALUES(last_alias), " ...
-                "last_join_date = VALUES(last_join_date)",
-                escaped_name, players[client].steamid, game.mapId, players[client].mapSessionStart, amount, players[client].steamid,
-                escaped_name, escaped_name, amount);
-
-			#if defined DEBUG
-			PrintToServer("[Debug] UPSERT Map Stat %s (+%d) for %N on map %s [%s]", name, amount, client, game.mapId, players[client].steamid);
-			#endif
-			SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, lowPriority ? DBPrio_Low : DBPrio_Normal);
-		}
-	}
-}
+// OLD FUNCTIONS REMOVED - REPLACED BY OPTIMIZED BATCH SYSTEM
 
 void GetTopWeapon(int client, char[] buffer, int maxlen) {
 	buffer[0] = '\0';
@@ -1885,7 +1840,7 @@ void Event_PlayerLeftStartArea(Event event, const char[] name, bool dontBroadcas
 				GetEntPropVector(entity, Prop_Data, "m_vecOrigin", pos);
 				if(L4D_IsPositionInLastCheckpoint(pos)) {
 					PrintToConsoleAll("[Stats] Player %N forgot to pickup a kit", client);
-					IncrementStat(client, "forgot_kit_count");
+					IncrementStatOptimized(client, "forgot_kit_count");
 					break;
 				}
 			}
@@ -1911,9 +1866,9 @@ public void Event_BoomerExploded(Event event, const char[] name, bool dontBroadc
 public Action L4D_OnVomitedUpon(int victim, int &attacker, bool &boomerExplosion) {
 	if(boomerExplosion && GetGameTime() - g_iLastBoomTime < 23.0) {
 		if(victim == g_iLastBoomUser)
-			IncrementStat(g_iLastBoomUser, "boomer_mellos_self");
+			IncrementStatOptimized(g_iLastBoomUser, "boomer_mellos_self");
 		else
-			IncrementStat(g_iLastBoomUser, "boomer_mellos");
+			IncrementStatOptimized(g_iLastBoomUser, "boomer_mellos");
 	}
 	return Plugin_Continue;
 }
@@ -1948,11 +1903,15 @@ public void Event_InfectedHurt(Event event, const char[] name, bool dontBroadcas
 }
 public void Event_InfectedDeath(Event event, const char[] name, bool dontBroadcast) {
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
-	PrintToServer("[l4d2_stats_recorder] InfectedDeath event: attacker=%d", attacker);
 	
 	if(attacker > 0 && !IsFakeClient(attacker)) {
-		PrintToServer("[l4d2_stats_recorder] Valid attacker %N (ID:%d, Team:%d, SteamID:'%s')", 
-			attacker, attacker, GetClientTeam(attacker), players[attacker].steamid);
+		#if defined DEBUG
+		// PERFORMANCE: Reduce debug spam significantly
+		static int debugCounter = 0;
+		if(debugCounter++ % 20 == 0) { // Only log every 20th kill
+			PrintToServer("[l4d2_stats_recorder] InfectedDeath #%d: %N", debugCounter, attacker);
+		}
+		#endif
 			
 		bool blast = event.GetBool("blast");
 		bool headshot = event.GetBool("headshot");
@@ -1961,8 +1920,7 @@ public void Event_InfectedDeath(Event event, const char[] name, bool dontBroadca
 		if(headshot) {
 			players[attacker].RecordPoint(PType_Headshot, 2);
 			players[attacker].wpn.headshots++;
-			IncrementStat(attacker, "common_headshots", 1);
-			IncrementMapStat(attacker, "common_headshots", 1);
+			IncrementBothStatsOptimized(attacker, "common_headshots", 1);
 		}
 
 		players[attacker].RecordPoint(PType_CommonKill, 1);
@@ -1974,11 +1932,17 @@ public void Event_InfectedDeath(Event event, const char[] name, bool dontBroadca
 			players[attacker].pipeKills++;
 		}
 	} else {
-		if(attacker <= 0) {
-			PrintToServer("[l4d2_stats_recorder] InfectedDeath: Invalid attacker ID %d", attacker);
-		} else if(IsFakeClient(attacker)) {
-			PrintToServer("[l4d2_stats_recorder] InfectedDeath: Attacker %d is fake client (bot)", attacker);
+		#if defined DEBUG
+		// PERFORMANCE: Reduce debug spam for invalid attackers
+		static int invalidCounter = 0;
+		if(invalidCounter++ % 50 == 0) { // Only log every 50th invalid
+			if(attacker <= 0) {
+				PrintToServer("[l4d2_stats_recorder] Invalid attacker IDs: %d occurrences", invalidCounter);
+			} else if(IsFakeClient(attacker)) {
+				PrintToServer("[l4d2_stats_recorder] Bot kills: %d occurrences", invalidCounter);
+			}
 		}
+		#endif
 	}
 }
 public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast) {
@@ -2015,8 +1979,8 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 			players[attacker].RecordPoint(PType_FriendlyFire, penalty);
 
 			// Update map-specific stats with raw damage
-			IncrementMapStat(attacker, "survivor_ff", dmg);
-			IncrementMapStat(victim, "survivor_ff_rec", dmg);
+			IncrementMapStatOptimized(attacker, "survivor_ff", dmg);
+			IncrementMapStatOptimized(victim, "survivor_ff_rec", dmg);
 		}
 	}
 	
@@ -2038,7 +2002,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
 		if(!IsFakeClient(victim)) {
 			if(victim_team == 2) {
-				IncrementBothStats(victim, "survivor_deaths", 1);
+				IncrementBothStatsOptimized(victim, "survivor_deaths", 1);
 				players[victim].RecordPoint(PType_Death, -10);
 				float pos[3];
 				GetClientAbsOrigin(victim, pos);
@@ -2056,7 +2020,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 				if(GetInfectedClassName(victim_class, class, sizeof(class))) {
 					IncrementSpecialKill(attacker, victim_class);
 					Format(statname, sizeof(statname), "kills_%s", class);
-					IncrementBothStats(attacker, statname, 1);
+					IncrementBothStatsOptimized(attacker, statname, 1);
 					players[attacker].RecordPoint(PType_SpecialKill, 6);
 				}
 				char wpn_name[16];
@@ -2064,10 +2028,10 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 				if(StrEqual(wpn_name, "inferno", true) || StrEqual(wpn_name, "entityflame", true)) {
 					players[attacker].molotovKills++;
 				}
-				IncrementBothStats(victim, "infected_deaths", 1);
+				IncrementBothStatsOptimized(victim, "infected_deaths", 1);
 			} else if(victim_team == 2 && attacker != victim) {
 				// Record raw teammate kill stat - penalty calculation handled by API
-				IncrementBothStats(attacker, "ff_kills", 1);
+				IncrementBothStatsOptimized(attacker, "ff_kills", 1);
 				players[attacker].RecordPoint(PType_TeammateKill, -500);
 			}
 		}
@@ -2122,7 +2086,7 @@ public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast)
 				
 				if(points > 0) {
 					players[i].RecordPoint(PType_TankKill, points);
-					IncrementBothStats(i, "tanks_killed", 1);
+					IncrementBothStatsOptimized(i, "tanks_killed", 1);
 					
 					#if defined DEBUG
 					PrintToServer("[DEBUG] Tank kill points: player=%d, damage=%d/%d (%.1f%%), points=%d", i, g_iTankDamage[i], totalTankDamage, damagePercent * 100.0, points);
@@ -2135,12 +2099,12 @@ public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast)
 	// Award bonus points only to the attacker (killer)
 	if(attacker > 0 && !IsFakeClient(attacker)) {
 		if(solo) {
-			IncrementStat(attacker, "tanks_killed_solo", 1);
+			IncrementStatOptimized(attacker, "tanks_killed_solo", 1);
 			players[attacker].RecordPoint(PType_TankKill_Solo, 20);
 		}
 		if(melee_only) {
 			players[attacker].RecordPoint(PType_TankKill_Melee, 50);
-			IncrementStat(attacker, "tanks_killed_melee", 1);
+			IncrementStatOptimized(attacker, "tanks_killed_melee", 1);
 		}
 	}
 	
@@ -2159,7 +2123,7 @@ public void Event_DoorOpened(Event event, const char[] name, bool dontBroadcast)
 void Event_PlayerIncap(Event event, const char[] name, bool dontBroadcast) {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if(!IsFakeClient(client) && GetClientTeam(client) == 2) {
-		IncrementBothStats(client, "survivor_incaps", 1);
+		IncrementBothStatsOptimized(client, "survivor_incaps", 1);
 		float pos[3];
 		GetClientAbsOrigin(client, pos);
 		players[client].RecordHeatMap(HeatMap_Incap, pos);
@@ -2171,7 +2135,7 @@ void Event_LedgeGrab(Event event, const char[] name, bool dontBroadcast) {
 		float pos[3];
 		GetClientAbsOrigin(client, pos);
 		players[client].RecordHeatMap(HeatMap_LedgeGrab, pos);
-		IncrementBothStats(client, "survivor_incaps", 1);
+		IncrementBothStatsOptimized(client, "survivor_incaps", 1);
 	}
 }
 //Track heals, or defibs
@@ -2181,7 +2145,7 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 		if(StrEqual(name, "heal_success", true)) {
 			int subject = GetClientOfUserId(event.GetInt("subject"));
 			if(subject == client) {
-				IncrementStat(client, "heal_self", 1);
+				IncrementStatOptimized(client, "heal_self", 1);
 			}else{
 				// Anti-abuse: Check heal cooldown and target health
 				int targetHealth = GetClientHealth(subject);
@@ -2206,26 +2170,26 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 					PrintToChat(client, "[Heal] No points awarded - %N has sufficient health (%d%%)", 
 						subject, healthPercent);
 				}
-				IncrementBothStats(client, "heal_others", 1);
+				IncrementBothStatsOptimized(client, "heal_others", 1);
 			}
 		} else if(StrEqual(name, "revive_success", true)) {
 			int subject = GetClientOfUserId(event.GetInt("subject"));
 			if(subject != client) {
-				IncrementBothStats(client, "revived_others", 1);
+				IncrementBothStatsOptimized(client, "revived_others", 1);
 				players[client].RecordPoint(PType_ReviveOther, 25);
-				IncrementBothStats(subject, "revived", 1);
+				IncrementBothStatsOptimized(subject, "revived", 1);
 			}
 		} else if(StrEqual(name, "defibrillator_used", true)) {
 			players[client].RecordPoint(PType_ResurrectOther, 50);
-			IncrementBothStats(client, "defibs_used", 1);
+			IncrementBothStatsOptimized(client, "defibs_used", 1);
 		} else if(StrEqual(name, "pills_used", true)) {
-			IncrementStat(client, name, 1);
+			IncrementStatOptimized(client, name, 1);
 			players[client].RecordPoint(PType_PillUse, 10);
 		} else if(StrEqual(name, "adrenaline_used", true)) {
-			IncrementStat(client, name, 1);
+			IncrementStatOptimized(client, name, 1);
 			players[client].RecordPoint(PType_AdrenalineUse, 15);
 		} else{
-			IncrementStat(client, name, 1);
+			IncrementStatOptimized(client, name, 1);
 		}
 	}
 }
@@ -2240,7 +2204,7 @@ public void Event_UpgradePackUsed(Event event, const char[] name, bool dontBroad
 public void Event_CarAlarm(Event event, const char[] name, bool dontBroadcast) {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if(client > 0 && !IsFakeClient(client)) {
-		IncrementStat(client, "caralarms_activated", 1);
+		IncrementStatOptimized(client, "caralarms_activated", 1);
 		players[client].RecordPoint(PType_CarAlarm, -10);
 	}
 }
@@ -2320,13 +2284,13 @@ void EntityCreateCallback(int entity) {
 	int entOwner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
 	if(entOwner > 0 && entOwner <= MaxClients && !IsFakeClient(entOwner)) {
 		if(StrContains(class, "vomitjar", true) > -1) {
-			IncrementStat(entOwner, "throws_puke", 1);
+			IncrementStatOptimized(entOwner, "throws_puke", 1);
 			players[entOwner].RecordPoint(PType_BileUse, 5);
 		} else if(StrContains(class, "molotov", true) > -1) {
-			IncrementStat(entOwner, "throws_molotov", 1);
+			IncrementStatOptimized(entOwner, "throws_molotov", 1);
 			players[entOwner].RecordPoint(PType_MolotovUse, 5);
 		} else if(StrContains(class, "pipe_bomb", true) > -1) {
-			IncrementStat(entOwner, "throws_pipe", 1);
+			IncrementStatOptimized(entOwner, "throws_pipe", 1);
 			players[entOwner].RecordPoint(PType_PipeUse, 5);
 		}
 	}
@@ -2358,6 +2322,9 @@ public void Event_GameStart(Event event, const char[] name, bool dontBroadcast) 
 	}
 }
 public void OnMapStart() {
+	// PERFORMANCE: Initialize fresh accumulators for new map
+	InitializeBatchSystem();
+	
 	if(isTransition) {
 		isTransition = false;
 	}else{
@@ -2395,7 +2362,11 @@ public void Event_MapTransition(Event event, const char[] name, bool dontBroadca
 	}
 }
 public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast) {
-	PrintToServer("[l4d2_stats_recorder] round_end; flushing");
+	PrintToServer("[l4d2_stats_recorder] round_end; flushing stats and database");
+	
+	// PERFORMANCE: Flush all accumulated stats to database
+	FlushAllAccumulatedStats();
+	
 	game.finished = false;
 	
 	for(int i = 1; i <= MaxClients; i++) {
@@ -2452,6 +2423,11 @@ void Event_FinaleVehicleLeaving(Event event, const char[] name, bool dontBroadca
 
 void Event_FinaleWin(Event event, const char[] name, bool dontBroadcast) {
 	if(!L4D_IsMissionFinalMap() || game.submitted) return;
+	
+	// PERFORMANCE: Flush all accumulated stats to database on campaign completion
+	PrintToServer("[PERFORMANCE] Campaign completed - flushing all accumulated stats");
+	FlushAllAccumulatedStats();
+	
 	game.difficulty = event.GetInt("difficulty");
 	game.finished = false;
 	char shortID[9];
@@ -2469,7 +2445,7 @@ void Event_FinaleWin(Event event, const char[] name, bool dontBroadcast) {
 				players[client].RecordPoint(PType_FinishCampaign, 1000);
 				IncrementSessionStat(client);
 				RecordCampaign(client);
-				IncrementBothStats(client, "finales_won", 1);
+				IncrementBothStatsOptimized(client, "finales_won", 1);
 				if(game.uuid[0] != '\0')
 					// PrintToChat(client, "View this game's statistics at <your-domain>/c/%s", shortID);
 				if(game.clownHonks > 0) {
@@ -2535,24 +2511,24 @@ void Event_FinaleWin(Event event, const char[] name, bool dontBroadcast) {
 // FORWARD EVENTS
 ///////////////////////////
 public void OnWitchCrown(int survivor, int damage) {
-	IncrementStat(survivor, "witches_crowned", 1);
+	IncrementStatOptimized(survivor, "witches_crowned", 1);
 	players[survivor].RecordPoint(PType_WitchCrown, 25);
 }
 public void OnSmokerSelfClear( int survivor, int smoker, bool withShove ) {
-	IncrementStat(survivor, "smokers_selfcleared", 1);
+	IncrementStatOptimized(survivor, "smokers_selfcleared", 1);
 	players[survivor].RecordPoint(PType_SmokerSelfClear, 10);
 }
 public void OnTankRockEaten( int tank, int survivor ) {
-	IncrementStat(survivor, "rocks_hitby", 1);
+	IncrementStatOptimized(survivor, "rocks_hitby", 1);
 	players[survivor].RecordPoint(PType_TankRockHit, -10);
 }
 public void OnHunterDeadstop(int survivor, int hunter) {
-	IncrementStat(survivor, "hunters_deadstopped", 1);
+	IncrementStatOptimized(survivor, "hunters_deadstopped", 1);
 	players[survivor].RecordPoint(PType_HunterDeadstop, 20);
 }
 public void OnSpecialClear( int clearer, int pinner, int pinvictim, int zombieClass, float timeA, float timeB, bool withShove ) {
-	IncrementStat(clearer, "cleared_pinned", 1);
-	IncrementStat(pinvictim, "times_pinned", 1);
+	IncrementStatOptimized(clearer, "cleared_pinned", 1);
+	IncrementStatOptimized(pinvictim, "times_pinned", 1);
 
 	// Award points for saving teammate from special infected
 	if(clearer > 0 && !IsFakeClient(clearer)) {
@@ -2630,4 +2606,295 @@ stock int GetSurvivorCount() {
 		}
 	}
 	return count;
+}
+
+// Performance monitoring command
+public Action Command_PerformanceStats(int client, int args) {
+	ReplyToCommand(client, "[PERFORMANCE] === Statistics Accumulator Status ===");
+	ReplyToCommand(client, "[PERFORMANCE] Total events this map: %d", g_iTotalEventsThisMap);
+	
+	int totalAccumulated = 0;
+	for(int i = 1; i <= MaxClients; i++) {
+		if(IsClientInGame(i) && !IsFakeClient(i) && players[i].steamid[0]) {
+			int lifetimeStats = (g_hAccumulatedStats[i] != null) ? g_hAccumulatedStats[i].Size : 0;
+			int mapStats = (g_hAccumulatedMapStats[i] != null) ? g_hAccumulatedMapStats[i].Size : 0;
+			int eventCount = g_iEventCounter[i];
+			
+			if(lifetimeStats > 0 || mapStats > 0 || eventCount > 0) {
+				ReplyToCommand(client, "[PERFORMANCE] %N: %d lifetime, %d map stats, %d events", 
+					i, lifetimeStats, mapStats, eventCount);
+				totalAccumulated += lifetimeStats + mapStats;
+			}
+		}
+	}
+	
+	ReplyToCommand(client, "[PERFORMANCE] Total accumulated stats pending: %d", totalAccumulated);
+	ReplyToCommand(client, "[PERFORMANCE] Database writes saved: ~%d (vs immediate mode)", g_iTotalEventsThisMap * 2);
+	return Plugin_Handled;
+}
+
+// ========================================================================================
+// PERFORMANCE OPTIMIZATION: MAP-END BATCH DATABASE SYSTEM
+// ========================================================================================
+
+// Initialize the performance system
+void InitializeBatchSystem() {
+	// Initialize stat accumulators for all clients
+	for(int i = 1; i <= MaxClients; i++) {
+		if(g_hAccumulatedStats[i] != null) {
+			delete g_hAccumulatedStats[i];
+		}
+		if(g_hAccumulatedMapStats[i] != null) {
+			delete g_hAccumulatedMapStats[i];
+		}
+		
+		g_hAccumulatedStats[i] = new StringMap();
+		g_hAccumulatedMapStats[i] = new StringMap();
+		
+		g_iEventCounter[i] = 0;
+		g_fLastEventTime[i] = 0.0;
+	}
+	
+	g_iDebugSpamCounter = 0;
+	g_iTotalEventsThisMap = 0;
+	
+	#if defined DEBUG
+	PrintToServer("[PERFORMANCE] Map-end batch system initialized - stats will be written to DB only at map completion");
+	#endif
+}
+
+// Shutdown the batch system and flush all data
+void ShutdownBatchSystem() {
+	FlushAllAccumulatedStats();
+	
+	for(int i = 1; i <= MaxClients; i++) {
+		if(g_hAccumulatedStats[i] != null) {
+			delete g_hAccumulatedStats[i];
+			g_hAccumulatedStats[i] = null;
+		}
+		if(g_hAccumulatedMapStats[i] != null) {
+			delete g_hAccumulatedMapStats[i];
+			g_hAccumulatedMapStats[i] = null;
+		}
+	}
+	
+	#if defined DEBUG
+	PrintToServer("[PERFORMANCE] Batch system shutdown - %d total events processed this map", g_iTotalEventsThisMap);
+	#endif
+}
+
+// Add to in-memory accumulator (ZERO database operations during gameplay)
+void AccumulateStatChange(int client, const char[] statName, int amount, bool isMapStat) {
+	if(client <= 0 || client > MaxClients || IsFakeClient(client) || !IsClientConnected(client)) {
+		return;
+	}
+	
+	if(!players[client].steamid[0]) {
+		return;
+	}
+	
+	// Performance throttling for excessive events
+	g_iTotalEventsThisMap++;
+	float currentTime = GetGameTime();
+	if(currentTime - g_fLastEventTime[client] > 5.0) { // Reset every 5 seconds
+		g_iEventCounter[client] = 0;
+		g_fLastEventTime[client] = currentTime;
+	}
+	
+	if(g_iEventCounter[client] >= EVENT_THROTTLE_THRESHOLD) {
+		#if defined DEBUG
+		if(g_iDebugSpamCounter++ < DEBUG_SPAM_LIMIT) {
+			PrintToServer("[PERFORMANCE] Event throttling for %N (events: %d)", client, g_iEventCounter[client]);
+		}
+		#endif
+		return;
+	}
+	
+	g_iEventCounter[client]++;
+	
+	// Add to appropriate accumulator
+	StringMap targetMap = isMapStat ? g_hAccumulatedMapStats[client] : g_hAccumulatedStats[client];
+	if(targetMap == null) {
+		LogError("[PERFORMANCE] Accumulator not initialized for client %d", client);
+		return;
+	}
+	
+	int currentValue;
+	if(!targetMap.GetValue(statName, currentValue)) {
+		currentValue = 0;
+	}
+	targetMap.SetValue(statName, currentValue + amount);
+}
+
+// Flush all accumulated stats to database (called at map end)
+void FlushAllAccumulatedStats() {
+	if(g_db == INVALID_HANDLE) {
+		LogError("[PERFORMANCE] Database handle is invalid during flush.");
+		return;
+	}
+	
+	int totalStatsWritten = 0;
+	
+	for(int client = 1; client <= MaxClients; client++) {
+		if(g_hAccumulatedStats[client] == null || g_hAccumulatedMapStats[client] == null) {
+			continue;
+		}
+		
+		if(!players[client].steamid[0]) {
+			continue;
+		}
+		
+		// Flush lifetime stats
+		StringMapSnapshot statsSnapshot = g_hAccumulatedStats[client].Snapshot();
+		for(int i = 0; i < statsSnapshot.Length; i++) {
+			int keySize = statsSnapshot.KeyBufferSize(i);
+			char[] statName = new char[keySize];
+			statsSnapshot.GetKey(i, statName, keySize);
+			
+			int value;
+			if(g_hAccumulatedStats[client].GetValue(statName, value) && value != 0) {
+				ExecuteStatUpdateImmediate(players[client].steamid, statName, value, true);
+				totalStatsWritten++;
+			}
+		}
+		delete statsSnapshot;
+		
+		// Flush map stats
+		StringMapSnapshot mapStatsSnapshot = g_hAccumulatedMapStats[client].Snapshot();
+		for(int i = 0; i < mapStatsSnapshot.Length; i++) {
+			int keySize = mapStatsSnapshot.KeyBufferSize(i);
+			char[] statName = new char[keySize];
+			mapStatsSnapshot.GetKey(i, statName, keySize);
+			
+			int value;
+			if(g_hAccumulatedMapStats[client].GetValue(statName, value) && value != 0) {
+				ExecuteMapStatUpdateImmediate(players[client].steamid, statName, value, true);
+				totalStatsWritten++;
+			}
+		}
+		delete mapStatsSnapshot;
+		
+		// Clear the accumulators after flushing
+		g_hAccumulatedStats[client].Clear();
+		g_hAccumulatedMapStats[client].Clear();
+	}
+	
+	#if defined DEBUG
+	PrintToServer("[PERFORMANCE] Flushed %d accumulated stats to database (Total events this map: %d)", 
+		totalStatsWritten, g_iTotalEventsThisMap);
+	#endif
+}
+
+// Execute immediate database update (used during flush)
+void ExecuteStatUpdateImmediate(const char[] steamid, const char[] statName, int amount, bool lowPriority) {
+	int escaped_name_size = 2*strlen(statName)+1;
+	char[] escaped_name = new char[escaped_name_size];
+	char query[255];
+	g_db.Escape(statName, escaped_name, escaped_name_size);
+	Format(query, sizeof(query), "UPDATE stats_users SET `stats_users`.`%s`=`stats_users`.`%s`+%d WHERE steamid='%s'", 
+		escaped_name, escaped_name, amount, steamid);
+	SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, lowPriority ? DBPrio_Low : DBPrio_Normal);
+}
+
+// Execute immediate map stat update (ASYNC version to avoid locks)
+void ExecuteMapStatUpdateImmediate(const char[] steamid, const char[] statName, int amount, bool lowPriority) {
+	int escaped_name_size = 2*strlen(statName)+1;
+	char[] escaped_name = new char[escaped_name_size];
+	char query[1400];
+	g_db.Escape(statName, escaped_name, escaped_name_size);
+
+	// Ensure map exists first (async - no locking!)
+	int escaped_mapid_size = 2*strlen(game.mapId)+1;
+	char[] escaped_mapid = new char[escaped_mapid_size];
+	char escaped_maptitle[256];
+	g_db.Escape(game.mapId, escaped_mapid, escaped_mapid_size);
+	g_db.Escape(game.mapTitle, escaped_maptitle, sizeof(escaped_maptitle));
+	
+	char ensureMapQuery[512];
+	g_db.Format(ensureMapQuery, sizeof(ensureMapQuery), 
+		"INSERT IGNORE INTO map_info (mapid, name, chapter_count) VALUES ('%s','%s',%d)", 
+		escaped_mapid, escaped_maptitle, L4D_GetMaxChapters());
+	SQL_TQuery(g_db, DBCT_Generic, ensureMapQuery, QUERY_MAP_INFO, DBPrio_Low);
+
+	// Update map stats (async)
+	Format(query, sizeof(query),
+		"INSERT INTO stats_map_users (steamid, mapid, session_start, last_alias, last_join_date, created_date, country, %s, session_end) " ...
+		"SELECT '%s', '%s', UNIX_TIMESTAMP(), last_alias, last_join_date, created_date, country, %d, UNIX_TIMESTAMP() " ...
+		"FROM stats_users WHERE steamid = '%s' " ...
+		"ON DUPLICATE KEY UPDATE " ...
+		"`stats_map_users`.`%s` = `stats_map_users`.`%s` + %d, " ...
+		"session_end = UNIX_TIMESTAMP(), " ...
+		"last_alias = VALUES(last_alias), " ...
+		"last_join_date = VALUES(last_join_date)",
+		escaped_name, steamid, game.mapId, amount, steamid,
+		escaped_name, escaped_name, amount);
+
+	SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, lowPriority ? DBPrio_Low : DBPrio_Normal);
+}
+
+// OPTIMIZED REPLACEMENT FUNCTIONS (ZERO database operations during gameplay)
+void IncrementStatOptimized(int client, const char[] name, int amount = 1, bool lowPriority = true) {
+	#pragma unused lowPriority
+	AccumulateStatChange(client, name, amount, false);
+}
+
+void IncrementMapStatOptimized(int client, const char[] name, int amount = 1, bool lowPriority = true) {
+	#pragma unused lowPriority
+	AccumulateStatChange(client, name, amount, true);
+}
+
+void IncrementBothStatsOptimized(int client, const char[] name, int amount = 1, bool lowPriority = true) {
+	#pragma unused lowPriority
+	AccumulateStatChange(client, name, amount, false);  // Lifetime stats
+	AccumulateStatChange(client, name, amount, true);   // Map-specific stats
+}
+
+// Flush accumulated stats for a single client (used on disconnect)
+void FlushClientAccumulatedStats(int client) {
+	if(client <= 0 || client > MaxClients) return;
+	if(g_hAccumulatedStats[client] == null || g_hAccumulatedMapStats[client] == null) return;
+	if(!players[client].steamid[0]) return;
+	if(g_db == INVALID_HANDLE) return;
+	
+	int statsWritten = 0;
+	
+	// Flush lifetime stats
+	StringMapSnapshot statsSnapshot = g_hAccumulatedStats[client].Snapshot();
+	for(int i = 0; i < statsSnapshot.Length; i++) {
+		int keySize = statsSnapshot.KeyBufferSize(i);
+		char[] statName = new char[keySize];
+		statsSnapshot.GetKey(i, statName, keySize);
+		
+		int value;
+		if(g_hAccumulatedStats[client].GetValue(statName, value) && value != 0) {
+			ExecuteStatUpdateImmediate(players[client].steamid, statName, value, true);
+			statsWritten++;
+		}
+	}
+	delete statsSnapshot;
+	
+	// Flush map stats
+	StringMapSnapshot mapStatsSnapshot = g_hAccumulatedMapStats[client].Snapshot();
+	for(int i = 0; i < mapStatsSnapshot.Length; i++) {
+		int keySize = mapStatsSnapshot.KeyBufferSize(i);
+		char[] statName = new char[keySize];
+		mapStatsSnapshot.GetKey(i, statName, keySize);
+		
+		int value;
+		if(g_hAccumulatedMapStats[client].GetValue(statName, value) && value != 0) {
+			ExecuteMapStatUpdateImmediate(players[client].steamid, statName, value, true);
+			statsWritten++;
+		}
+	}
+	delete mapStatsSnapshot;
+	
+	// Clear the accumulators
+	g_hAccumulatedStats[client].Clear();
+	g_hAccumulatedMapStats[client].Clear();
+	
+	#if defined DEBUG
+	if(statsWritten > 0) {
+		PrintToServer("[PERFORMANCE] Flushed %d stats for disconnecting client %N", statsWritten, client);
+	}
+	#endif
 }
