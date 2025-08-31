@@ -118,12 +118,24 @@ enum struct Game {
 
 	void GetMap() {
 		GetCurrentMap(this.mapId, sizeof(this.mapId));
+		
+		// Validate mapId was retrieved successfully
+		if(strlen(this.mapId) == 0) {
+			LogError("[l4d2_stats_recorder] GetCurrentMap() returned empty string");
+			// Fallback: try to get map name again or use a default
+			strcopy(this.mapId, sizeof(this.mapId), "unknown");
+		}
+		
 		this.isCustomMap = this.mapId[0] != 'c' || !IsCharNumeric(this.mapId[1]) || !(IsCharNumeric(this.mapId[2]) || this.mapId[2] == 'm');
 		if(this.isCustomMap)
 			InfoEditor_GetString(0, "DisplayTitle", this.mapTitle, sizeof(this.mapTitle));
 		else {
 			int mapIndex = StringToInt(this.mapId[1]) - 1;
-			strcopy(this.mapTitle, sizeof(this.mapTitle), OFFICIAL_MAP_NAMES[mapIndex]);
+			if(mapIndex >= 0 && mapIndex < sizeof(OFFICIAL_MAP_NAMES)) {
+				strcopy(this.mapTitle, sizeof(this.mapTitle), OFFICIAL_MAP_NAMES[mapIndex]);
+			} else {
+				strcopy(this.mapTitle, sizeof(this.mapTitle), "Unknown Map");
+			}
 		}
 		InfoEditor_GetString(0, "Name", this.missionId, sizeof(this.missionId));
 		PrintToServer("[Stats] %s \"%s\" %s (c=%b)", this.mapId, this.mapTitle, this.missionId, this.isCustomMap);
@@ -854,7 +866,7 @@ void IncrementStat(int client, const char[] name, int amount = 1, bool lowPriori
 //Initialize map session record for cumulative statistics tracking
 void InitializeMapSession(int client) {
 	if(client > 0 && !IsFakeClient(client) && IsClientConnected(client)) {
-		if (players[client].steamid[0] && game.mapId[0] && players[client].mapSessionStart > 0) {
+		if (players[client].steamid[0] && EnsureMapIdExists() && players[client].mapSessionStart > 0) {
 			if(g_db == INVALID_HANDLE) {
 				LogError("Database handle is invalid.");
 				return;
@@ -901,7 +913,7 @@ void InitializeMapSession(int client) {
 //Finalize map session by setting session_end timestamp
 void FinalizeMapSession(int client) {
 	if(client > 0 && !IsFakeClient(client)) {
-		if (players[client].steamid[0] && game.mapId[0]) {
+		if (players[client].steamid[0] && EnsureMapIdExists()) {
 			if(g_db == INVALID_HANDLE) {
 				LogError("Database handle is invalid.");
 				return;
@@ -932,7 +944,7 @@ void IncrementBothStats(int client, const char[] name, int amount = 1, bool lowP
 //Increments a map-specific statistic for stats_map_users table
 void IncrementMapStat(int client, const char[] name, int amount = 1, bool lowPriority = true) {
 	if(client > 0 && !IsFakeClient(client) && IsClientConnected(client)) {
-		if (players[client].steamid[0] && game.mapId[0] && players[client].mapSessionStart > 0) {
+		if (players[client].steamid[0] && EnsureMapIdExists() && players[client].mapSessionStart > 0) {
 			if(g_db == INVALID_HANDLE) {
 				LogError("Database handle is invalid.");
 				return;
@@ -1187,14 +1199,48 @@ void SubmitPoints(int client) {
 	}
 }
 
+// Helper function to ensure mapId is valid
+bool EnsureMapIdExists() {
+	if(strlen(game.mapId) == 0) {
+		LogError("[l4d2_stats_recorder] MapId is empty, attempting to refresh...");
+		game.GetMap();
+		
+		// If still empty after refresh, use fallback
+		if(strlen(game.mapId) == 0) {
+			LogError("[l4d2_stats_recorder] Failed to get mapId, using fallback");
+			strcopy(game.mapId, sizeof(game.mapId), "unknown");
+		}
+	}
+	return strlen(game.mapId) > 0;
+}
+
 // New function to actually submit points after ensuring user exists
 void SubmitPointsNow(int client) {
 	if(players[client].pointsQueue.Length > 0) {
+		// Validate required data before building query
+		if(strlen(players[client].steamid) == 0) {
+			LogError("[l4d2_stats_recorder] Cannot submit points: SteamID is empty for client %d", client);
+			return;
+		}
+		
+		// Ensure mapId exists with fallback logic
+		if(!EnsureMapIdExists()) {
+			LogError("[l4d2_stats_recorder] Cannot submit points: Unable to determine mapId");
+			return;
+		}
+		
 		char query[4098];
 		char escapedSteamId[64];
 		char escapedMapId[128];
 		g_db.Escape(players[client].steamid, escapedSteamId, sizeof(escapedSteamId));
 		g_db.Escape(game.mapId, escapedMapId, sizeof(escapedMapId));
+
+		// Double-check escaped strings are not empty
+		if(strlen(escapedSteamId) == 0 || strlen(escapedMapId) == 0) {
+			LogError("[l4d2_stats_recorder] Cannot submit points: escaped data is empty (steamid='%s', mapId='%s')", 
+				escapedSteamId, escapedMapId);
+			return;
+		}
 
 		Format(query, sizeof(query), "INSERT INTO stats_points (steamid,type,amount,timestamp,mapId) VALUES ");
 		for(int i = 0; i < players[client].pointsQueue.Length; i++) {
@@ -1211,6 +1257,9 @@ void SubmitPointsNow(int client) {
 				i == players[client].pointsQueue.Length - 1 ? ';' : ',' // Semicolon on last entry
 			);
 		}
+		
+		// Add debug logging to see the final query
+		PrintToServer("[l4d2_stats_recorder] Executing query: %s", query);
 		SQL_TQuery(g_db, DBCT_SubmitPoints, query, GetClientUserId(client), DBPrio_Low);
 		// Don't clear the queue here - wait for confirmation
 	}
