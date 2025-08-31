@@ -1,7 +1,6 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-// #define DEBUG 1
 #define PLUGIN_VERSION "1.1"
 
 #include <sourcemod>
@@ -13,9 +12,7 @@
 #undef REQUIRE_PLUGIN
 #include <l4d2_skill_detect>
 
-// SETTINGS
 
-// Each coordinate (x,y,z) is rounded to nearest multiple of this. 
 #define HEATMAP_POINT_SIZE 10
 #define MAX_HEATMAP_VISUALS 200
 #define HEATMAP_PAGINATION_SIZE 500
@@ -66,38 +63,33 @@ int g_iLastBoomUser;
 float g_iLastBoomTime;
 Menu g_rateMenu;
 
-// Tank damage tracking for multiple tanks support
-int g_iTankDamage[MAXPLAYERS + 1];     // Per-tank damage tracking
-bool g_bTankInPlay = false;            // Is tank currently active
-int g_iTankClient = 0;                 // Current tank client ID
-int g_iTankHealth;                     // Current tank health (used in DEBUG builds)
+int g_iTankDamage[MAXPLAYERS + 1];
+bool g_bTankInPlay = false;
+int g_iTankClient = 0;
+int g_iTankHealth;
 #pragma unused g_iTankHealth
-#define ZOMBIECLASS_TANK 8             // Tank zombie class ID
+#define ZOMBIECLASS_TANK 8
 
-// Anti-abuse: Time-based heal cooldown system
-int g_iLastHealTime[MAXPLAYERS + 1][MAXPLAYERS + 1]; // [healer][target] - last heal time
-#define HEAL_COOLDOWN_TIME 300         // 5 minutes in seconds
-#define HEAL_HEALTH_THRESHOLD 60       // Only award points if target health <= 60%
-#define HEAL_CRITICAL_THRESHOLD 30     // Bonus points if target health <= 30%
+int g_iLastHealTime[MAXPLAYERS + 1][MAXPLAYERS + 1];
+#define HEAL_COOLDOWN_TIME 300
+#define HEAL_HEALTH_THRESHOLD 60
+#define HEAL_CRITICAL_THRESHOLD 30
 
-// PERFORMANCE OPTIMIZATION: Map-End Batch Database System
-#define EVENT_THROTTLE_THRESHOLD 50    // Max events per player per batch cycle
-#define DEBUG_SPAM_LIMIT 10            // Reduce debug spam
+#define EVENT_THROTTLE_THRESHOLD 50
+#define DEBUG_SPAM_LIMIT 10
 
-// In-memory stat accumulators - only write to DB at map end
-StringMap g_hAccumulatedStats[MAXPLAYERS + 1];     // [client] -> StringMap of stat names to values
-StringMap g_hAccumulatedMapStats[MAXPLAYERS + 1];  // [client] -> StringMap of map stat names to values
+StringMap g_hAccumulatedStats[MAXPLAYERS + 1];
+StringMap g_hAccumulatedMapStats[MAXPLAYERS + 1];
 
-// Performance monitoring
-int g_iEventCounter[MAXPLAYERS + 1];   // Count events per player for throttling
-float g_fLastEventTime[MAXPLAYERS + 1]; // Last event time for rate limiting
-int g_iDebugSpamCounter;               // Debug spam counter
+int g_iEventCounter[MAXPLAYERS + 1];
+float g_fLastEventTime[MAXPLAYERS + 1];
+int g_iDebugSpamCounter;
 #pragma unused g_iDebugSpamCounter
-int g_iTotalEventsThisMap = 0;         // Total events processed this map
+int g_iTotalEventsThisMap = 0;
 
 char OFFICIAL_MAP_NAMES[14][] = {
-	"Dead Center",   // c1
-	"Dark Carnival", // c2
+	"Dead Center",
+	"Dark Carnival",
 	"Swamp Fever",   // c3
 	"Hard Rain",     // c4
 	"The Parish",    // c5
@@ -456,8 +448,6 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	if(late) lateLoaded = true;
 	return APLRes_Success;
 }
-//TODO: player_use (Check laser sights usage)
-//TODO: Versus as infected stats
 //TODO: Move kills to queue stats not on demand
 //TODO: Track if lasers were had?
 
@@ -573,15 +563,12 @@ public void OnPluginStart() {
 	CreateTimer(DISTANCE_CALC_TIMER_INTERVAL, Timer_CalculateDistances, _, TIMER_REPEAT);
 }
 
-//When plugin is being unloaded: flush all user's statistics.
 public void OnPluginEnd() {
-	// Flush any pending batch operations before shutdown
 	FlushAllAccumulatedStats();
 	ShutdownBatchSystem();
 	
 	for(int i=1; i<=MaxClients;i++) {
 		if(IsClientInGame(i) && !IsFakeClient(i) && players[i].steamid[0]) {
-			// FlushQueuedStats(i, false); // REMOVED: Only push points at round end
 		}
 	}
 	ClearHeatMapEntities();
@@ -597,8 +584,6 @@ void RunMigrations() {
 		g_db.Query(DBCT_Migration, MIGRATIONS[i], i);
 	}
 }
-//////////////////////////////////
-// TIMER
 /////////////////////////////////
 Action Timer_HeatMapInterval(Handle h) {
 	// Skip recording any points when visualizing or escape vehicle ready
@@ -686,8 +671,6 @@ public Action Timer_HonkCounter(Handle h) {
 	return Plugin_Continue; 
 }
 /////////////////////////////////
-// PLAYER AUTH
-/////////////////////////////////
 public void OnClientAuthorized(int client, const char[] auth) {
 	PrintToServer("[l4d2_stats_recorder] OnClientAuthorized: client=%d, auth='%s'", client, auth);
 	
@@ -759,17 +742,11 @@ public void OnClientDisconnect(int client) {
 			if(newTankClient > 0) {
 				g_iTankClient = newTankClient;
 				g_iTankHealth = GetClientHealth(newTankClient);
-				#if defined DEBUG
-				PrintToServer("[DEBUG] Tank passed to client %d", newTankClient);
-				#endif
 			} else {
 				// Tank disconnected without passing, reset tracking
 				g_bTankInPlay = false;
 				g_iTankClient = 0;
 				g_iTankHealth = 0;
-				#if defined DEBUG
-				PrintToServer("[DEBUG] Tank disconnected, resetting tracking");
-				#endif
 			}
 		}
 
@@ -870,7 +847,6 @@ void SetupUserInDB(int client, const char steamid[32]) {
 		SQL_TQuery(g_db, DBCT_CheckUserExistance, query, GetClientUserId(client));
 	}
 }
-// OLD FUNCTION - REPLACED BY OPTIMIZED VERSION
 
 //Initialize map session record for cumulative statistics tracking
 void InitializeMapSession(int client) {
@@ -911,9 +887,6 @@ void InitializeMapSession(int client) {
 				players[client].steamid, game.mapId, players[client].mapSessionStart, players[client].steamid,
 				players[client].mapSessionStart);
 
-			#if defined DEBUG
-			PrintToServer("[Debug] Initializing map session for %N on map %s [%s]", client, game.mapId, players[client].steamid);
-			#endif
 			SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, DBPrio_Low);
 		}
 	}
@@ -936,18 +909,13 @@ void FinalizeMapSession(int client) {
 				"WHERE steamid = '%s' AND mapid = '%s'",
 				players[client].steamid, game.mapId);
 
-			#if defined DEBUG
-			PrintToServer("[Debug] Finalizing map session for %N on map %s [%s]", client, game.mapId, players[client].steamid);
-			#endif
 			SQL_TQuery(g_db, DBCT_Generic, query, QUERY_UPDATE_STAT, DBPrio_Low);
 		}
 	}
 }
 
 //Increments both lifetime and map-specific statistics
-// OLD FUNCTION - REPLACED BY OPTIMIZED VERSION
 
-// OLD FUNCTIONS REMOVED - REPLACED BY OPTIMIZED BATCH SYSTEM
 
 void GetTopWeapon(int client, char[] buffer, int maxlen) {
 	buffer[0] = '\0';
@@ -1396,12 +1364,8 @@ public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[]
 		char steamid_short[16];
 		strcopy(steamid_short, sizeof(steamid_short), players[client].steamid[8]); // Skip "STEAM_0:"
 		Format(alias, sizeof(alias), "Player_%s", steamid_short);
-		LogMessage("[l4d2_stats_recorder] Using fallback name for player %d: '%s' (SteamID: %s)", 
-			client, alias, players[client].steamid);
 	}
 	
-	PrintToServer("[l4d2_stats_recorder] Processing player %N with name '%s' (length: %d, SteamID: %s)", 
-		client, alias, strlen(alias), players[client].steamid);
 		
 	SQL_EscapeString(g_db, alias, safe_alias, alias_length);
 
@@ -1414,10 +1378,8 @@ public void DBCT_CheckUserExistance(Handle db, DBResultSet results, const char[]
 		Format(query, sizeof(query), "%N is joining for the first time", client);
 		for(int i = 1; i <= MaxClients; i++) {
 			if(IsClientInGame(i) && GetUserAdmin(i) != INVALID_ADMIN_ID) {
-				PrintToChat(i, query);
 			}
 		}
-		PrintToServer("[l4d2_stats_recorder] Created new database entry for %N (%s)", client, players[client].steamid);
 	} else {
 		//User does exist, check if alias is outdated and update some columns (last_join_date, country, connections, or last_alias)
 		results.FetchRow();
@@ -1905,13 +1867,6 @@ public void Event_InfectedDeath(Event event, const char[] name, bool dontBroadca
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
 	
 	if(attacker > 0 && !IsFakeClient(attacker)) {
-		#if defined DEBUG
-		// PERFORMANCE: Reduce debug spam significantly
-		static int debugCounter = 0;
-		if(debugCounter++ % 20 == 0) { // Only log every 20th kill
-			PrintToServer("[l4d2_stats_recorder] InfectedDeath #%d: %N", debugCounter, attacker);
-		}
-		#endif
 			
 		bool blast = event.GetBool("blast");
 		bool headshot = event.GetBool("headshot");
@@ -1931,18 +1886,6 @@ public void Event_InfectedDeath(Event event, const char[] name, bool dontBroadca
 		} else if(blast) {
 			players[attacker].pipeKills++;
 		}
-	} else {
-		#if defined DEBUG
-		// PERFORMANCE: Reduce debug spam for invalid attackers
-		static int invalidCounter = 0;
-		if(invalidCounter++ % 50 == 0) { // Only log every 50th invalid
-			if(attacker <= 0) {
-				PrintToServer("[l4d2_stats_recorder] Invalid attacker IDs: %d occurrences", invalidCounter);
-			} else if(IsFakeClient(attacker)) {
-				PrintToServer("[l4d2_stats_recorder] Bot kills: %d occurrences", invalidCounter);
-			}
-		}
-		#endif
 	}
 }
 public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast) {
@@ -1988,10 +1931,6 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 	if(g_bTankInPlay && victim == g_iTankClient && attacker > 0 && IsClientInGame(attacker) && !IsFakeClient(attacker)) {
 		// Track damage to current tank only
 		g_iTankDamage[attacker] += dmg;
-		
-		#if defined DEBUG
-		PrintToServer("[DEBUG] Tank damage: attacker=%d, damage=%d, total=%d", attacker, dmg, g_iTankDamage[attacker]);
-		#endif
 	}
 }
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast) {
@@ -2055,10 +1994,6 @@ public void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast) 
 		g_bTankInPlay = true;
 		g_iTankClient = client;
 		g_iTankHealth = GetClientHealth(client);
-		
-		#if defined DEBUG
-		PrintToServer("[DEBUG] Tank spawned: client=%d, health=%d", client, g_iTankHealth);
-		#endif
 	}
 }
 
@@ -2087,10 +2022,6 @@ public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast)
 				if(points > 0) {
 					players[i].RecordPoint(PType_TankKill, points);
 					IncrementBothStatsOptimized(i, "tanks_killed", 1);
-					
-					#if defined DEBUG
-					PrintToServer("[DEBUG] Tank kill points: player=%d, damage=%d/%d (%.1f%%), points=%d", i, g_iTankDamage[i], totalTankDamage, damagePercent * 100.0, points);
-					#endif
 				}
 			}
 		}
@@ -2633,13 +2564,8 @@ public Action Command_PerformanceStats(int client, int args) {
 	return Plugin_Handled;
 }
 
-// ========================================================================================
-// PERFORMANCE OPTIMIZATION: MAP-END BATCH DATABASE SYSTEM
-// ========================================================================================
 
-// Initialize the performance system
 void InitializeBatchSystem() {
-	// Initialize stat accumulators for all clients
 	for(int i = 1; i <= MaxClients; i++) {
 		if(g_hAccumulatedStats[i] != null) {
 			delete g_hAccumulatedStats[i];
@@ -2657,10 +2583,6 @@ void InitializeBatchSystem() {
 	
 	g_iDebugSpamCounter = 0;
 	g_iTotalEventsThisMap = 0;
-	
-	#if defined DEBUG
-	PrintToServer("[PERFORMANCE] Map-end batch system initialized - stats will be written to DB only at map completion");
-	#endif
 }
 
 // Shutdown the batch system and flush all data
@@ -2677,10 +2599,6 @@ void ShutdownBatchSystem() {
 			g_hAccumulatedMapStats[i] = null;
 		}
 	}
-	
-	#if defined DEBUG
-	PrintToServer("[PERFORMANCE] Batch system shutdown - %d total events processed this map", g_iTotalEventsThisMap);
-	#endif
 }
 
 // Add to in-memory accumulator (ZERO database operations during gameplay)
@@ -2702,11 +2620,6 @@ void AccumulateStatChange(int client, const char[] statName, int amount, bool is
 	}
 	
 	if(g_iEventCounter[client] >= EVENT_THROTTLE_THRESHOLD) {
-		#if defined DEBUG
-		if(g_iDebugSpamCounter++ < DEBUG_SPAM_LIMIT) {
-			PrintToServer("[PERFORMANCE] Event throttling for %N (events: %d)", client, g_iEventCounter[client]);
-		}
-		#endif
 		return;
 	}
 	
@@ -2778,11 +2691,6 @@ void FlushAllAccumulatedStats() {
 		g_hAccumulatedStats[client].Clear();
 		g_hAccumulatedMapStats[client].Clear();
 	}
-	
-	#if defined DEBUG
-	PrintToServer("[PERFORMANCE] Flushed %d accumulated stats to database (Total events this map: %d)", 
-		totalStatsWritten, g_iTotalEventsThisMap);
-	#endif
 }
 
 // Execute immediate database update (used during flush)
@@ -2891,10 +2799,4 @@ void FlushClientAccumulatedStats(int client) {
 	// Clear the accumulators
 	g_hAccumulatedStats[client].Clear();
 	g_hAccumulatedMapStats[client].Clear();
-	
-	#if defined DEBUG
-	if(statsWritten > 0) {
-		PrintToServer("[PERFORMANCE] Flushed %d stats for disconnecting client %N", statsWritten, client);
-	}
-	#endif
 }
