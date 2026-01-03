@@ -1,0 +1,10 @@
+services:
+  sourcemod-compiler:
+    build: .
+    container_name: sourcemod-compiler
+    platform: linux/amd64  # Force x86_64 for compatibility
+    volumes:
+      - ../../:/workspace  # Mount project root
+    working_dir: /workspace
+    profiles:
+      - tools  # Only start when explicitly requested

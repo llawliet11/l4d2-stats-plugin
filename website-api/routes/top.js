@@ -3,7 +3,7 @@ const router = Router()
 import routeCache from 'route-cache'
 
 export default function(pool) {
-    router.get('/users/:page?', routeCache.cacheSeconds(60), async(req,res) => {
+    router.get('/users/:page?', routeCache.cacheSeconds(30), async(req,res) => {
         try {
             const MAX_RESULTS = req.query.max_results ? parseInt(req.query.max_results) || 15 : 15;
     
@@ -11,33 +11,21 @@ export default function(pool) {
             const pageNumber = (isNaN(selectedPage) || selectedPage <= 0) ? 0 : (parseInt(req.params.page) - 1);
             const offset = pageNumber * MAX_RESULTS;
             let rows, version
-            if(req.query.version == "1") {
-                [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` ORDER BY `points` DESC, `minutes_played` DESC LIMIT ?,?", [offset, MAX_RESULTS])
-                version = "v1"
-            } else {
-                [rows] = await pool.query(`select
-                     steamid,last_alias,minutes_played,last_join_date,
-                    points as points_old,
-                    (
-                        (common_kills / 1000 * 0.10) +
-                        (kills_all_specials * 0.25) +
-                        (revived_others * 0.05) +
-                        (heal_others * 0.05) -
-                        (survivor_incaps * 0.10) -
-                        (survivor_deaths * 0.05) +
-                        (survivor_ff * 0.03) +
-                        (damage_to_tank*0.15/minutes_played) +
-                        ((kills_molotov+kills_pipe)*0.025) +
-                        (witches_crowned*0.2) -
-                        (rocks_hitby*0.2) +
-                        (cleared_pinned*0.05)
-                    ) as points
-                    from stats_users
-                    order by points desc
-                    limit ?,?`, 
+            if(req.query.version == "2") {
+                // Legacy v2 - show all users including those with 0 or negative points
+                [rows] = await pool.query(`SELECT
+                     steamid,last_alias,minutes_played,last_join_date,points
+                    FROM stats_users
+                    WHERE minutes_played >= 0
+                    ORDER BY points DESC, minutes_played DESC
+                    LIMIT ?,?`,
                     [offset, MAX_RESULTS]
                 )
                 version = "v2"
+            } else {
+                // Default: Use corrected database points (v1) - show all users including 0/negative points
+                [rows] = await pool.query("SELECT steamid,last_alias,minutes_played,last_join_date,points FROM `stats_users` WHERE minutes_played >= 0 ORDER BY `points` DESC, `minutes_played` DESC LIMIT ?,?", [offset, MAX_RESULTS])
+                version = "v1"
             }
             res.json({
                 users: rows,
@@ -48,7 +36,7 @@ export default function(pool) {
             res.status(500).json({error:"Internal Server Error"})
         }
     })
-    router.get('/stats', routeCache.cacheSeconds(43200), async(req,res) => {
+    router.get('/stats', routeCache.cacheSeconds(300), async(req,res) => {
         try {
             const [deaths] = await pool.execute(`SELECT steamid,last_alias,points,survivor_deaths as value FROM \`stats_users\`  
                 WHERE survivor_deaths > 0 ORDER BY \`stats_users\`.\`survivor_deaths\` desc, \`stats_users\`.\`points\` desc limit 10`, [])
@@ -91,5 +79,21 @@ export default function(pool) {
             res.status(500).json({error:"Internal Server Error"})
         }
     })
+    
+    // Cache clearing endpoint for debugging
+    router.post('/clear-cache', async(req,res) => {
+        try {
+            // Clear route cache if available
+            if(routeCache.removeCache) {
+                routeCache.removeCache('/api/top/users');
+                routeCache.removeCache('/api/top/stats');
+            }
+            res.json({success: true, message: 'Cache cleared'});
+        } catch(err) {
+            console.error('[/api/top/clear-cache]', err.message);
+            res.status(500).json({error: 'Failed to clear cache'});
+        }
+    })
+    
     return router;
 }

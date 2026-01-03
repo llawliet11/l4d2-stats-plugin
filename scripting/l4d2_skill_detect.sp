@@ -103,11 +103,22 @@
 #define ZC_TANK         8
 #define HITGROUP_HEAD   1
 
+// DMG constants are already defined in SourceMod includes
+#if !defined DMG_CRUSH
 #define DMG_CRUSH               (1 << 0)        // crushed by falling or moving object.
+#endif
+#if !defined DMG_BULLET
 #define DMG_BULLET              (1 << 1)        // shot
+#endif
+#if !defined DMG_SLASH
 #define DMG_SLASH               (1 << 2)        // cut, clawed, stabbed
+#endif
+#if !defined DMG_CLUB
 #define DMG_CLUB                (1 << 7)        // crowbar, punch, headbutt
+#endif
+#if !defined DMG_BUCKSHOT
 #define DMG_BUCKSHOT            (1 << 29)       // not quite a bullet. Little, rounder, different.
+#endif
 
 #define DMGARRAYEXT     7                       // MAXPLAYERS+# -- extra indices in witch_dmg_array + 1
 
@@ -3108,6 +3119,7 @@ public bool: ChargeTraceFilter (entity, contentsMask)
 
 stock PrintDebug(debuglevel, const String:Message[], any:... )
 {
+    #pragma unused debuglevel
     decl String:DebugBuff[256];
     VFormat(DebugBuff, sizeof(DebugBuff), Message, 3);
     LogMessage(DebugBuff);

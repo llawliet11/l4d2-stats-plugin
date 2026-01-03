@@ -164,16 +164,27 @@
                 <div class="box">
                     <h5 class="title is-5 has-text-centered">Players</h5>
                     <span class="has-text-left" v-if="users.length > 0">
-                        <div v-for="userRecord in users" :key="userRecord.steamid">
-                            <div>
+                        <div v-for="userRecord in users" :key="userRecord.steamid" class="player-item" :class="{ 'bg-mvp': userRecord.isMVP }">
+                            <div class="player-content">
                                 <div class="has-text-left is-inline-block">
                                   <b-tooltip label="Click to view their profile" position="is-left">
-                                    <router-link  :to="'/user/' + userRecord.steamid"><b>{{userRecord.last_alias}}</b></router-link>
+                                    <router-link :to="'/user/' + userRecord.steamid">
+                                        <b>{{ userRecord.last_alias }}</b>
+                                        <span v-if="userRecord.isMVP" class="mvp-badge">MVP</span>
+                                    </router-link>
                                   </b-tooltip>
                                 </div>
                                 <div class="is-pulled-right is-inline">
-                                    <router-link v-if="session.steamid != userRecord.steamid" :to="'/sessions/details/' + userRecord.id">(view stats)</router-link>
+                                    <span v-if="userRecord.points" class="points-display">{{ userRecord.points | formatNumber }} pts</span>
+                                    <router-link v-if="session.steamid != userRecord.steamid" :to="'/sessions/details/' + userRecord.id" class="view-stats-link">(view stats)</router-link>
                                 </div>
+                            </div>
+                            <div v-if="userRecord.isMVP" class="mvp-stats">
+                                <small>
+                                    Specials: {{ userRecord.SpecialInfectedKills || 0 }} |
+                                    FF: {{ userRecord.SurvivorFFCount || 0 }} |
+                                    Zombies: {{ userRecord.ZombieKills || 0 }}
+                                </small>
                             </div>
                         </div>
                     </span>
@@ -222,7 +233,7 @@
                     </div>
                 </div>
                 <em>Campaign ID</em><br>
-                <em><router-link :to="campaignURL"> {{session.campaignID}}</router-link></em>
+                <em>{{session.campaignID}}</em>
             </div>
         </div>
         <nav class="level">
@@ -388,10 +399,7 @@ export default {
             ], '#62a4b4');
         },
 
-        campaignURL() {
-            return this.session && this.session.campaignID ?
-                `/campaigns/${this.session.campaignID.substring(0,8)}` : '#'
-        },
+
         topWeaponName() {
           if(!this.session.top_weapon) return null
           let weapon = GameInfo.weapons[this.session.top_weapon.slice(7)]
@@ -462,3 +470,51 @@ export default {
     }
 }
 </script>
+
+<style scoped>
+.player-item {
+    padding: 8px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+
+.bg-mvp {
+    background-color: #3273dc !important;
+    color: white;
+}
+
+.bg-mvp a {
+    color: white !important;
+}
+
+.mvp-badge {
+    background-color: #ffdd57;
+    color: #363636;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 6px;
+}
+
+.mvp-stats {
+    margin-top: 4px;
+    opacity: 0.9;
+}
+
+.points-display {
+    margin-right: 8px;
+    font-weight: bold;
+}
+
+.view-stats-link {
+    font-size: 0.85rem;
+}
+
+.player-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+</style>

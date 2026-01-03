@@ -1,0 +1,545 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: services_l4d2stats-database:3306
+-- Generation Time: Aug 24, 2025 at 05:55 PM
+-- Server version: 11.8.2-MariaDB-ubu2404
+-- PHP Version: 8.2.27
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `left4dead2`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `map_info`
+--
+
+CREATE TABLE `map_info` (
+  `mission_id` varchar(64) DEFAULT NULL,
+  `mapid` varchar(32) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `chapter_count` smallint(6) DEFAULT NULL,
+  `flags` smallint(6) DEFAULT 0 COMMENT '1:official'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `map_ratings`
+--
+
+CREATE TABLE `map_ratings` (
+  `map_id` varchar(64) NOT NULL,
+  `steamid` varchar(32) NOT NULL,
+  `value` tinyint(4) NOT NULL,
+  `comment` varchar(200) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_games`
+--
+
+CREATE TABLE `stats_games` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `steamid` varchar(20) NOT NULL,
+  `map` varchar(128) NOT NULL COMMENT 'the map id',
+  `flags` tinyint(4) NOT NULL DEFAULT 0,
+  `campaignID` uuid NOT NULL COMMENT 'unique campaign session id',
+  `gamemode` varchar(30) CHARACTER SET ascii COLLATE ascii_general_ci DEFAULT NULL,
+  `difficulty` tinyint(2) NOT NULL DEFAULT 0,
+  `duration` int(11) GENERATED ALWAYS AS ((`date_end` - `date_start`) / 60) VIRTUAL COMMENT 'in minutes',
+  `join_time` bigint(20) UNSIGNED NOT NULL COMMENT 'when user first joined game',
+  `date_start` bigint(20) UNSIGNED DEFAULT NULL COMMENT 'when campaign started',
+  `date_end` bigint(20) NOT NULL,
+  `finale_time` int(11) UNSIGNED NOT NULL,
+  `characterType` tinyint(3) UNSIGNED DEFAULT NULL,
+  `ping` tinyint(4) UNSIGNED DEFAULT NULL,
+  `server_tags` text DEFAULT NULL,
+  `ZombieKills` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `MeleeKills` smallint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `SurvivorDamage` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `SurvivorFFCount` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `SurvivorFFTakenCount` int(11) DEFAULT NULL,
+  `SurvivorFFDamage` int(11) DEFAULT NULL,
+  `SurvivorFFTakenDamage` int(11) DEFAULT NULL,
+  `MedkitsUsed` tinyint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `FirstAidShared` tinyint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `PillsUsed` smallint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `MolotovsUsed` smallint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `PipebombsUsed` smallint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `BoomerBilesUsed` smallint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `AdrenalinesUsed` smallint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `DefibrillatorsUsed` smallint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `DamageTaken` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `ReviveOtherCount` smallint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `Incaps` smallint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `Deaths` tinyint(10) UNSIGNED NOT NULL DEFAULT 0,
+  `boomer_kills` smallint(10) UNSIGNED DEFAULT NULL,
+  `smoker_kills` smallint(10) UNSIGNED DEFAULT NULL,
+  `jockey_kills` smallint(10) UNSIGNED DEFAULT NULL,
+  `hunter_kills` smallint(10) UNSIGNED DEFAULT NULL,
+  `spitter_kills` smallint(10) UNSIGNED DEFAULT NULL,
+  `charger_kills` smallint(10) UNSIGNED DEFAULT NULL,
+  `SpecialInfectedKills` int(10) UNSIGNED GENERATED ALWAYS AS (`boomer_kills` + `spitter_kills` + `jockey_kills` + `charger_kills` + `hunter_kills` + `smoker_kills`) VIRTUAL,
+  `honks` smallint(5) UNSIGNED DEFAULT 0,
+  `top_weapon` varchar(64) DEFAULT NULL,
+  `minutes_idle` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `WitchesCrowned` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `SmokersSelfCleared` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `RocksHitBy` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `RocksDodged` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `HuntersDeadstopped` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `TimesPinned` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `ClearedPinned` mediumint(8) UNSIGNED DEFAULT 0,
+  `BoomedTeammates` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `TimesBoomed` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `DamageToTank` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `DamageToWitch` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `DamageDealt` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `CarAlarmsActivated` tinyint(3) UNSIGNED NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_heatmaps`
+--
+
+CREATE TABLE `stats_heatmaps` (
+  `id` int(11) NOT NULL,
+  `steamid` varchar(32) NOT NULL,
+  `timestamp` int(11) NOT NULL DEFAULT unix_timestamp(),
+  `map` varchar(64) NOT NULL,
+  `type` smallint(6) NOT NULL,
+  `x` int(11) DEFAULT NULL,
+  `y` int(11) DEFAULT NULL,
+  `z` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_map_users`
+--
+
+CREATE TABLE `stats_map_users` (
+  `steamid` varchar(20) NOT NULL,
+  `last_alias` varchar(32) NOT NULL,
+  `last_join_date` bigint(11) NOT NULL,
+  `created_date` bigint(11) NOT NULL,
+  `connections` int(11) UNSIGNED NOT NULL DEFAULT 1,
+  `country` varchar(45) NOT NULL,
+  `points` int(10) NOT NULL DEFAULT 0,
+  `survivor_deaths` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `infected_deaths` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_damage_rec` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_damage_give` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `infected_damage_rec` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `infected_damage_give` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pickups_molotov` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pickups_pipe_bomb` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_incaps` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pills_used` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `defibs_used` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `adrenaline_used` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `heal_self` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `heal_others` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `revived` int(11) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Times themselves revived',
+  `revived_others` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pickups_pain_pills` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `melee_kills` int(11) UNSIGNED DEFAULT 0,
+  `tanks_killed` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `tanks_killed_solo` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `tanks_killed_melee` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_ff` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_ff_rec` int(11) DEFAULT 0,
+  `common_kills` int(10) UNSIGNED DEFAULT 0,
+  `common_headshots` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `door_opens` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `damage_to_tank` int(10) UNSIGNED DEFAULT 0,
+  `damage_as_tank` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `damage_witch` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `minutes_played` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `finales_won` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_smoker` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_boomer` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_hunter` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_spitter` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_jockey` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_charger` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_witch` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `packs_used` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `ff_kills` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `throws_puke` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `throws_molotov` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `throws_pipe` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `damage_molotov` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_molotov` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_pipe` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_minigun` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `caralarms_activated` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `witches_crowned` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `witches_crowned_angry` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `smokers_selfcleared` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rocks_hitby` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `hunters_deadstopped` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `cleared_pinned` int(10) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Times cleared a survivor thats pinned',
+  `times_pinned` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `clowns_honked` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `minutes_idle` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `boomer_mellos` int(11) DEFAULT 0,
+  `boomer_mellos_self` smallint(6) DEFAULT 0,
+  `forgot_kit_count` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `total_distance_travelled` float DEFAULT 0,
+  `mapid` varchar(32) NOT NULL,
+  `session_start` bigint(20) UNSIGNED NOT NULL,
+  `session_end` bigint(20) UNSIGNED DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_map_users_ff_penalty_backup`
+--
+
+CREATE TABLE `stats_map_users_ff_penalty_backup` (
+  `steamid` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `mapid` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `survivor_ff` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_ff_rec` int(11) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_points`
+--
+
+CREATE TABLE `stats_points` (
+  `id` int(11) NOT NULL,
+  `steamid` varchar(32) NOT NULL,
+  `type` smallint(6) NOT NULL,
+  `amount` smallint(6) NOT NULL,
+  `timestamp` int(11) NOT NULL,
+  `mapId` varchar(32) DEFAULT NULL,
+  `original_amount` smallint(6) DEFAULT NULL COMMENT 'Backup of original amount before recalculation',
+  `calculated_at` timestamp NULL DEFAULT NULL COMMENT 'When the amount was last recalculated',
+  `calculation_version` varchar(10) DEFAULT NULL COMMENT 'Version of point-system.json used for calculation'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_users`
+--
+
+CREATE TABLE `stats_users` (
+  `steamid` varchar(20) NOT NULL,
+  `last_alias` varchar(32) NOT NULL,
+  `last_join_date` bigint(11) NOT NULL,
+  `created_date` bigint(11) NOT NULL,
+  `connections` int(11) UNSIGNED NOT NULL DEFAULT 1,
+  `country` varchar(45) NOT NULL,
+  `points` int(10) NOT NULL DEFAULT 0,
+  `survivor_deaths` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `infected_deaths` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_damage_rec` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_damage_give` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `infected_damage_rec` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `infected_damage_give` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pickups_molotov` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pickups_pipe_bomb` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_incaps` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pills_used` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `defibs_used` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `adrenaline_used` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `heal_self` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `heal_others` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `revived` int(11) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Times themselves revived',
+  `revived_others` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pickups_pain_pills` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `melee_kills` int(11) UNSIGNED DEFAULT 0,
+  `tanks_killed` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `tanks_killed_solo` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `tanks_killed_melee` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_ff` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_ff_rec` int(11) DEFAULT 0,
+  `common_kills` int(10) UNSIGNED DEFAULT 0,
+  `common_headshots` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `door_opens` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `damage_to_tank` int(10) UNSIGNED DEFAULT 0,
+  `damage_as_tank` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `damage_witch` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `minutes_played` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `finales_won` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_smoker` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_boomer` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_hunter` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_spitter` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_jockey` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_charger` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_witch` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `packs_used` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `ff_kills` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `throws_puke` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `throws_molotov` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `throws_pipe` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `damage_molotov` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_molotov` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_pipe` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_minigun` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `caralarms_activated` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `witches_crowned` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `witches_crowned_angry` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `smokers_selfcleared` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rocks_hitby` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `hunters_deadstopped` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `cleared_pinned` int(10) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Times cleared a survivor thats pinned',
+  `times_pinned` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `clowns_honked` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `minutes_idle` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `boomer_mellos` int(11) DEFAULT 0,
+  `boomer_mellos_self` smallint(6) DEFAULT 0,
+  `forgot_kit_count` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `total_distance_travelled` float DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_users_backup`
+--
+
+CREATE TABLE `stats_users_backup` (
+  `steamid` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `last_alias` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `last_join_date` bigint(11) NOT NULL,
+  `created_date` bigint(11) NOT NULL,
+  `connections` int(11) UNSIGNED NOT NULL DEFAULT 1,
+  `country` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `points` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_deaths` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `infected_deaths` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_damage_rec` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_damage_give` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `infected_damage_rec` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `infected_damage_give` bigint(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pickups_molotov` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pickups_pipe_bomb` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_incaps` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pills_used` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `defibs_used` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `adrenaline_used` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `heal_self` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `heal_others` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `revived` int(11) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Times themselves revived',
+  `revived_others` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `pickups_pain_pills` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `melee_kills` int(11) UNSIGNED DEFAULT 0,
+  `tanks_killed` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `tanks_killed_solo` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `tanks_killed_melee` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_ff` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_ff_rec` int(11) DEFAULT 0,
+  `common_kills` int(10) UNSIGNED DEFAULT 0,
+  `common_headshots` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `door_opens` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `damage_to_tank` int(10) UNSIGNED DEFAULT 0,
+  `damage_as_tank` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `damage_witch` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `minutes_played` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `finales_won` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_smoker` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_boomer` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_hunter` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_spitter` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_jockey` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_charger` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_witch` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `packs_used` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `ff_kills` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `throws_puke` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `throws_molotov` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `throws_pipe` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `damage_molotov` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_molotov` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_pipe` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_minigun` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `kills_all_specials` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `caralarms_activated` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `witches_crowned` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `witches_crowned_angry` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `smokers_selfcleared` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rocks_hitby` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `hunters_deadstopped` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `cleared_pinned` int(10) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Times cleared a survivor thats pinned',
+  `times_pinned` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `clowns_honked` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `minutes_idle` mediumint(8) UNSIGNED NOT NULL DEFAULT 0,
+  `boomer_mellos` int(11) DEFAULT 0,
+  `boomer_mellos_self` smallint(6) DEFAULT 0,
+  `forgot_kit_count` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `total_distance_travelled` float DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_users_ff_backup`
+--
+
+CREATE TABLE `stats_users_ff_backup` (
+  `steamid` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `last_alias` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `survivor_ff` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_ff_rec` int(11) DEFAULT 0,
+  `points` int(10) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_users_ff_separation_backup`
+--
+
+CREATE TABLE `stats_users_ff_separation_backup` (
+  `steamid` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `last_alias` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `survivor_ff` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `survivor_ff_rec` int(11) DEFAULT 0,
+  `points` int(10) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stats_weapons_usage`
+--
+
+CREATE TABLE `stats_weapons_usage` (
+  `steamid` varchar(32) NOT NULL,
+  `weapon` varchar(64) NOT NULL,
+  `minutesUsed` float DEFAULT NULL,
+  `totalDamage` bigint(20) NOT NULL,
+  `headshots` int(11) DEFAULT NULL,
+  `kills` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `map_info`
+--
+ALTER TABLE `map_info`
+  ADD PRIMARY KEY (`mapid`);
+
+--
+-- Indexes for table `map_ratings`
+--
+ALTER TABLE `map_ratings`
+  ADD PRIMARY KEY (`map_id`,`steamid`);
+
+--
+-- Indexes for table `stats_games`
+--
+ALTER TABLE `stats_games`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `userindex` (`steamid`);
+
+--
+-- Indexes for table `stats_heatmaps`
+--
+ALTER TABLE `stats_heatmaps`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `stats_map_users`
+--
+ALTER TABLE `stats_map_users`
+  ADD PRIMARY KEY (`steamid`,`mapid`,`session_start`),
+  ADD KEY `points` (`steamid`),
+  ADD KEY `idx_map_users_mapid` (`mapid`),
+  ADD KEY `idx_map_users_steamid` (`steamid`),
+  ADD KEY `idx_map_users_session` (`session_start`,`session_end`);
+ALTER TABLE `stats_map_users` ADD FULLTEXT KEY `last_alias` (`last_alias`);
+
+--
+-- Indexes for table `stats_points`
+--
+ALTER TABLE `stats_points`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `stats_points_stats_users_steamid_fk` (`steamid`),
+  ADD KEY `stats_points_timestamp_index` (`timestamp`),
+  ADD KEY `idx_stats_points_mapId` (`mapId`),
+  ADD KEY `idx_stats_points_original_amount` (`original_amount`),
+  ADD KEY `idx_stats_points_calculated_at` (`calculated_at`),
+  ADD KEY `idx_stats_points_calculation_version` (`calculation_version`),
+  ADD KEY `idx_stats_points_type` (`type`);
+
+--
+-- Indexes for table `stats_users`
+--
+ALTER TABLE `stats_users`
+  ADD PRIMARY KEY (`steamid`),
+  ADD KEY `points` (`steamid`);
+ALTER TABLE `stats_users` ADD FULLTEXT KEY `last_alias` (`last_alias`);
+
+--
+-- Indexes for table `stats_weapons_usage`
+--
+ALTER TABLE `stats_weapons_usage`
+  ADD PRIMARY KEY (`steamid`,`weapon`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `stats_games`
+--
+ALTER TABLE `stats_games`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `stats_heatmaps`
+--
+ALTER TABLE `stats_heatmaps`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `stats_points`
+--
+ALTER TABLE `stats_points`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `stats_map_users`
+--
+ALTER TABLE `stats_map_users`
+  ADD CONSTRAINT `fk_map_users_mapid` FOREIGN KEY (`mapid`) REFERENCES `map_info` (`mapid`) ON UPDATE CASCADE;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

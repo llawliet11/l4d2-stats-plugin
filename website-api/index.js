@@ -21,6 +21,7 @@ import RouteCampaigns from './routes/campaigns.js'
 import RouteMaps from './routes/maps.js'
 import RouteTop from './routes/top.js'
 import RouteMisc from './routes/misc.js'
+import RouteValidation from './routes/validation.js'
 
 
 (async function() {
@@ -37,9 +38,14 @@ import RouteMisc from './routes/misc.js'
     const pool = mysql.createPool(details);
     console.log('Connecting to', (details.socketPath || `${details.host}:${details.port}`), 'database', details.database)
 
+    // Middleware for parsing JSON requests
+    app.use(Express.json({ limit: '10mb' }));
+
     app.use((req, res, next) => {
         if(!req.headers.origin || whitelist.includes(req.headers.origin)) {
             res.header("Access-Control-Allow-Origin", req.headers.origin ?? "*");
+            res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
         }
         next()
     })
@@ -49,6 +55,7 @@ import RouteMisc from './routes/misc.js'
     app.use('/api/campaigns',   RouteCampaigns(pool))
     app.use('/api/maps',     RouteMaps(pool))
     app.use('/api/top',         RouteTop(pool))
+    app.use('/api/validation',  RouteValidation)
     app.use('/api/',            RouteMisc(pool))
 
     app.get('*',(req,res) => {

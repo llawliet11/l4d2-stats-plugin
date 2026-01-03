@@ -1,6 +1,10 @@
 import Router from 'express'
 const router = Router()
 import routeCache from 'route-cache'
+import fs from 'fs'
+import path from 'path'
+import MVPCalculator from '../services/MVPCalculator.js'
+import { addSpecialInfectedKills } from '../utils/dataHelpers.js'
 
 export default function(pool) {
     router.get('/', routeCache.cacheSeconds(120), async(req,res) => {
@@ -10,8 +14,47 @@ export default function(pool) {
             const selectedPage = req.query.page || 0
             const pageNumber = (isNaN(selectedPage) || selectedPage <= 0) ? 0 : (parseInt(selectedPage) - 1);
             const offset = pageNumber * perPage;
-            const [rows] = await pool.query("SELECT `stats_games`.*,last_alias,points FROM `stats_games` INNER JOIN `stats_users` ON `stats_games`.steamid = `stats_users`.steamid order by `stats_games`.id desc LIMIT ?,?", [offset, perPage])
-            const [total] = await pool.execute("SELECT COUNT(*)  AS total_sessions FROM `stats_games`");
+            
+            // Get user aggregated stats with all data needed for MVP calculation
+            const [rows] = await pool.query(`
+                SELECT
+                    u.steamid,
+                    u.last_alias,
+                    u.points,
+                    u.survivor_deaths,
+                    u.survivor_incaps,
+                    u.survivor_ff,
+                    u.survivor_ff_rec,
+                    u.survivor_damage_rec,
+                    u.common_kills,
+                    (u.kills_smoker + u.kills_boomer + u.kills_hunter + u.kills_spitter + u.kills_jockey + u.kills_charger) as special_infected_kills,
+                    u.heal_others,
+                    (u.throws_molotov + u.throws_pipe + u.throws_puke) as total_throwables,
+                    (u.pills_used + u.adrenaline_used) as total_pills_shots,
+                    u.tanks_killed,
+                    u.kills_witch,
+                    u.ff_kills,
+                    u.revived_others,
+                    u.defibs_used,
+                    u.finales_won,
+                    u.throws_molotov,
+                    u.throws_pipe,
+                    u.throws_puke,
+                    u.pills_used,
+                    u.adrenaline_used,
+                    'N/A' as map,
+                    'Overall' as difficulty
+                FROM stats_users u
+                WHERE u.points > 0
+                ORDER BY u.points DESC
+                LIMIT ?,?
+            `, [offset, perPage]);
+            
+            const [total] = await pool.execute("SELECT COUNT(*) AS total_sessions FROM stats_users WHERE points > 0");
+
+            // Calculate MVP using the centralized MVP calculator
+            MVPCalculator.calculateAndMarkMVP(rows);
+            
             return res.json({
                 sessions: rows,
                 total_sessions: total[0].total_sessions,
@@ -31,8 +74,60 @@ export default function(pool) {
                 if(row.length > 0) {
                     let users = [];
                     if(row[0].campaignID) {
-                        const [userlist] = await pool.query("SELECT stats_games.id,stats_users.steamid,stats_users.last_alias from `stats_games` inner join `stats_users` on `stats_users`.steamid = `stats_games`.steamid WHERE `campaignID`=?", [row[0].campaignID])
-                        users = userlist;
+                        // Load MVP calculation rules
+                        let calculationRules;
+                        try {
+                            const rulesPath = path.join(process.cwd(), 'config', 'calculation-rules.json');
+                            const rulesData = fs.readFileSync(rulesPath, 'utf8');
+                            calculationRules = JSON.parse(rulesData);
+                        } catch (err) {
+                            console.warn('[/api/sessions/:session] Could not load calculation rules, using defaults:', err.message);
+                            calculationRules = {
+                                mvp_calculation: {
+                                    criteria: [
+                                        { field: "SpecialInfectedKills", direction: "desc" },
+                                        { field: "SurvivorFFCount", direction: "asc" },
+                                        { field: "ZombieKills", direction: "desc" },
+                                        { field: "DamageTaken", direction: "asc" },
+                                        { field: "SurvivorDamage", direction: "asc" }
+                                    ]
+                                }
+                            };
+                        }
+
+                        // Build MVP sorting criteria from config
+                        const mvpCriteria = calculationRules.mvp_calculation?.criteria || [
+                            { field: "SpecialInfectedKills", direction: "desc" },
+                            { field: "SurvivorFFCount", direction: "asc" },
+                            { field: "ZombieKills", direction: "desc" },
+                            { field: "DamageTaken", direction: "asc" },
+                            { field: "SurvivorDamage", direction: "asc" }
+                        ]
+                        const orderBy = mvpCriteria.map(c => `${c.field} ${c.direction}`).join(', ')
+                        
+                        // Get campaign participants with MVP ranking
+                        const [userlist] = await pool.query(`
+                            SELECT 
+                                stats_games.id,
+                                stats_users.steamid,
+                                stats_users.last_alias,
+                                stats_games.points,
+                                stats_games.SpecialInfectedKills,
+                                stats_games.SurvivorFFCount,
+                                stats_games.ZombieKills,
+                                stats_games.DamageTaken,
+                                stats_games.SurvivorDamage
+                            FROM stats_games 
+                            INNER JOIN stats_users ON stats_users.steamid = stats_games.steamid 
+                            WHERE campaignID = ? 
+                            ORDER BY ${orderBy}
+                        `, [row[0].campaignID])
+                        
+                        // Mark the first player as MVP
+                        users = userlist.map((user, index) => ({
+                            ...user,
+                            isMVP: index === 0
+                        }));
                     }
                     res.json({session: row[0], users})
                 } else 

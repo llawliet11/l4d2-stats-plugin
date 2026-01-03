@@ -12,96 +12,133 @@
     </section>
     <br>
     <div class="container" v-if="totals && averages">
-        <p class="title is-6">Totals</p>
-        <nav class="level">
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Games Played</p>
-                <p class="title"><ICountUp :endVal="totals.total_games" /></p>
+        <!-- Totals Section -->
+        <div class="box has-background-primary-light mb-6">
+            <h2 class="title is-4 has-text-primary has-text-centered mb-5">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </span>
+                    <span>Total Statistics</span>
+                </span>
+            </h2>
+            <div class="columns is-multiline">
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">Games Played</p>
+                        <p class="title is-3 has-text-primary"><ICountUp :endVal="totals.total_games" /></p>
+                    </div>
+                </div>
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">Total Playtime</p>
+                        <p class="title is-3 has-text-info"><ICountUp :endVal="Math.round(totals.game_duration / 60 / 60)" /> hours</p>
+                    </div>
+                </div>
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">Zombies Killed</p>
+                        <p class="title is-3 has-text-success"><ICountUp :endVal="totals.zombie_kills" /></p>
+                    </div>
+                </div>
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">Total FF Damage</p>
+                        <p class="title is-3 has-text-danger"><ICountUp :endVal="totals.survivor_ff" /> HP</p>
+                    </div>
+                </div>
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">Unique Players</p>
+                        <p class="title is-3 has-text-link"><ICountUp :endVal="totals.total_users" /></p>
+                    </div>
                 </div>
             </div>
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Total Playtime</p>
-                <p class="title"><ICountUp :endVal="totals.game_duration / 60 / 60" /> hours</p>
+            <SummaryBit :values="totals" />
+        </div>
+        <!-- Averages Section -->
+        <div class="box has-background-info-light mb-6">
+            <h2 class="title is-4 has-text-info has-text-centered mb-5">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-calculator"></i>
+                    </span>
+                    <span>Average Statistics</span>
+                </span>
+            </h2>
+            <div class="columns is-multiline">
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">Game Duration</p>
+                        <p class="title is-3 has-text-info"><ICountUp :endVal="Math.round(averages.game_duration / 60)" /> min</p>
+                    </div>
+                </div>
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">Zombies Killed</p>
+                        <p class="title is-3 has-text-success"><ICountUp :endVal="Math.round(averages.zombie_kills)" /></p>
+                    </div>
+                </div>
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">Players per Game</p>
+                        <p class="title is-3 has-text-link"><ICountUp :endVal="averages.avgPlayers" /></p>
+                    </div>
+                </div>
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">FF Damage</p>
+                        <p class="title is-3 has-text-danger"><ICountUp :endVal="Math.round(averages.survivor_ff)" /> HP</p>
+                    </div>
+                </div>
+                <div class="column is-one-fifth">
+                    <div class="has-text-centered p-4">
+                        <p class="heading has-text-weight-semibold">Ping</p>
+                        <p class="title is-3 has-text-warning"><ICountUp :endVal="Math.round(averages.ping)" /> ms</p>
+                    </div>
                 </div>
             </div>
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Total FF Damage</p>
-                <p class="title"><ICountUp :endVal="totals.survivor_ff" /> HP</p>
+            <SummaryBit :values="averages" />
+        </div>
+        <!-- Map Statistics Section -->
+        <div v-if="hasMapData" class="box has-background-success-light">
+            <h2 class="title is-4 has-text-success has-text-centered mb-5">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-map"></i>
+                    </span>
+                    <span>Map Statistics</span>
+                </span>
+            </h2>
+            <div class="columns is-centered">
+                <div v-if="averages.top_map" class="column is-half">
+                    <div class="card">
+                        <div class="card-content has-text-centered">
+                            <p class="title is-5 has-text-success mb-4">Most Played Official Map</p>
+                            <figure class="image is-4by3 mb-4">
+                                <img :src="mostPlayedCampaignImage" class="is-rounded">
+                            </figure>
+                            <p class="title is-4 has-text-dark">{{getMapName(averages.top_map)}}</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Zombies Killed</p>
-                <p class="title"><ICountUp :endVal="totals.zombie_kills" /></p>
+                <div v-if="averages.least_map" class="column is-half">
+                    <div class="card">
+                        <div class="card-content has-text-centered">
+                            <p class="title is-5 has-text-warning mb-4">Least Played Official Map</p>
+                            <figure class="image is-4by3 mb-4">
+                                <img :src="leastPlayedCampaignImage" class="is-rounded">
+                            </figure>
+                            <p class="title is-4 has-text-dark">{{getMapName(averages.least_map)}}</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Unique Players</p>
-                <p class="title"><ICountUp :endVal="totals.total_users" /></p>
-                </div>
-            </div>
-        </nav>
-        <SummaryBit :values="totals" />
-        <hr>
-        <p class="title is-6">Averages</p>
-        <nav class="level">
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Average Game Duration</p>
-                <p class="title"><ICountUp :endVal="averages.game_duration / 60" /> min</p>
-                </div>
-            </div>
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Average Zombies Killed</p>
-                <p class="title"><ICountUp :endVal="averages.zombie_kills" /></p>
-                </div>
-            </div>
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Players per Game</p>
-                <p class="title"><ICountUp :endVal="averages.avgPlayers" /></p>
-                </div>
-            </div>
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Average FF Damage</p>
-                <p class="title"><ICountUp :endVal="averages.survivor_ff" /> HP</p>
-                </div>
-            </div>
-            <div class="level-item has-text-centered">
-                <div>
-                <p class="heading">Average Ping</p>
-                <p class="title"><ICountUp :endVal="averages.ping" /> ms</p>
-                </div>
-            </div>
-        </nav>
-        <SummaryBit :values="averages" />
-        <hr>
-        <div class="columns has-text-centered">
-            <div class="column">
-                <p class="title is-6">Most Played Official Map</p>
-                <figure class="image is-4by3">
-                    <img :src="mostPlayedCampaignImage">
-                </figure>
-                <p class="is-family-sans-serif is-size-4">{{getMapName(averages.top_map)}}</p>
-            </div>
-            <div class="column">
-                <p class="title is-6">Least Played Official Map</p>
-                <figure class="image is-4by3">
-                    <img :src="leastPlayedCampaignImage">
-                </figure>
-                <p class="is-family-sans-serif is-size-4">{{getMapName(averages.least_map)}}</p>
             </div>
         </div>
-        <span class='has-text-centered'>
+        <div v-if="mostPlayedDifficulty" class='has-text-centered'>
           <p><b>Most Played Difficulty:</b></p>
           <p>{{ mostPlayedDifficulty }}</p>
-        </span>
+        </div>
     </div>
     <br><br>
 </div>
@@ -130,8 +167,11 @@ export default {
         ]).finally(() => this.loading = false)
     },
     computed: {
+        hasMapData() {
+            return this.averages && (this.averages.top_map || this.averages.least_map);
+        },
         mostPlayedDifficulty() {
-            if(!this.averages) return null;
+            if(!this.averages || !this.averages.difficulty) return null;
             return GameInfo.difficulties[Number(this.averages.difficulty)]
         },
         mostPlayedCampaignImage() {

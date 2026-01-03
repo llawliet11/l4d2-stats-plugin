@@ -35,18 +35,21 @@
                             {{session.last_alias.substring(0,20)}}
                         </router-link>
                     </h6>
-                    <!-- TODO: Show a on hover description of MVP. Left side describes point breakdown, right shows values (3x3, etc) -->
-                    <p class="subtitle is-6">{{session.points | formatNumber}} points</p>
+                    <b-tooltip :label="mvpTooltipText" position="is-right" multilined size="is-medium">
+                        <p class="subtitle is-6">{{session.points | formatNumber}} points</p>
+                    </b-tooltip>
                     <hr class="player-divider">
                     <ul class="has-text-right">
                         <li><span class="has-text-info">{{session.ZombieKills}}</span> commons killed</li>
                         <li><span class="has-text-info">{{session.SpecialInfectedKills}}</span>  specials killed</li>
+                        <li><span class="has-text-info">{{session.SurvivorFFCount}}</span>  friendly fire count</li>
                         <li>
                             <span :class="['has-text-info',{'has-text-weight-bold': isMostFF(session)}]">
                               {{session.SurvivorDamage}}
                             </span>
                             friendly fire damage
                         </li>
+                        <li><span class="has-text-info">{{session.DamageTaken}}</span>  damage taken</li>
                         <li v-if="totals.honks > 0"><span class="has-text-info">{{session.honks}}</span>  clown honks</li>
                     </ul>
                     <br>
@@ -84,6 +87,12 @@
                         <div>
                         <p class="heading">Melee Kills</p>
                         <p class="title has-text-white">{{totals.MeleeKills}}</p>
+                        </div>
+                    </div>
+                    <div class="level-item has-text-centered">
+                        <div>
+                        <p class="heading">Friendly Fire Count</p>
+                        <p class="title has-text-white">{{totals.SurvivorFFCount}}</p>
                         </div>
                     </div>
                     <div class="level-item has-text-centered">
@@ -244,6 +253,14 @@ export default {
           }
         })
         return id;
+      },
+      mvpTooltipText() {
+        return `MVP is determined by the following criteria (in order):
+1. Special Infected Killed (highest)
+2. Friendly fired (lowest)  
+3. Zombie Kills (highest)
+4. Damage Taken (lowest)
+5. Friendly Fire (lowest)`
       }
     },
     methods: {
@@ -270,6 +287,7 @@ export default {
                     return {
                         ZombieKills: pv.ZombieKills + cv.ZombieKills,
                         SurvivorDamage: pv.SurvivorDamage + cv.SurvivorDamage,
+                        SurvivorFFCount: pv.SurvivorFFCount + cv.SurvivorFFCount,
                         Deaths: pv.Deaths + cv.Deaths,
                         DamageTaken: pv.DamageTaken + cv.DamageTaken,
                         MeleeKills: pv.MeleeKills + cv.MeleeKills,
@@ -372,10 +390,10 @@ export default {
 }
 .ribbon-honk::before,
 .ribbon-honk::after {
-  border: 5px solid #a025d1;
+  border: 5px solid #167df0;
 }
 .ribbon-honk span {
-  background-color: #a025d1;
+  background-color: #167df0;
 }
 
 @import url('../../css/ribbon.css')

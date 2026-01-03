@@ -236,4 +236,62 @@ export default {
   height: 15px !important;
   width: 15px !important;
 }
+
+/* Override carousel indicator colors */
+.carousel .carousel-indicator .indicator-item .indicator-style.is-dots {
+  background-color: #167df0 !important;
+}
+
+.carousel .carousel-indicator .indicator-item:not(.is-active) .indicator-style.is-dots {
+  background-color: rgba(22, 125, 240, 0.3) !important;
+}
+/* Leaderboard pagination styling */
+.pagination {
+  margin-right: 10px;
+}
+
+/* Style pagination in the leaderboard table */
+.beautiful-table .pagination-wrapper {
+  background: white;
+  padding: 15px 20px;
+  border-top: 1px solid #f5f5f5;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  display: flex;
+  justify-content: center;
+  margin: 0 ;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Center pagination specifically for leaderboard */
+.beautiful-table .pagination {
+  justify-content: center !important;
+  margin: 0 10px 0 0 !important;
+}
+
+/* Blue pagination buttons */
+.beautiful-table .pagination-link,
+.beautiful-table .pagination-previous,
+.beautiful-table .pagination-next {
+  background: #167df0 !important;
+  border-color: #167df0 !important;
+  color: white !important;
+  border-radius: 4px !important;
+}
+
+.beautiful-table .pagination-link:hover,
+.beautiful-table .pagination-previous:hover,
+.beautiful-table .pagination-next:hover {
+  background: #1366d6 !important;
+  border-color: #1366d6 !important;
+  color: white !important;
+}
+
+.beautiful-table .pagination-link.is-current {
+  background: #1366d6 !important;
+  border-color: #1366d6 !important;
+  color: white !important;
+}
 </style>

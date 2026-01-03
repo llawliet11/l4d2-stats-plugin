@@ -13,7 +13,7 @@
           @page-change="onPageChange"
       >
             <b-table-column field="type" label="Action" v-slot="props">
-                {{ getPointType(props.row.type) }}
+                {{ getActionDescription(props.row) }}
             </b-table-column>
             <b-table-column field="amount" label="Points" centered v-slot="props">
                 <span class="has-text-success" v-if="props.row.amount > 0">+{{ props.row.amount }}</span>
@@ -44,11 +44,32 @@
     "Solo Tank Kill", // PType_TankKill_Solo
     "Melee-Only Tank Kill",  // PType_TankKill_Melee,
     "Headshot",  // PType_Headshot,
-    "Friendly Fire",  // PType_FriendlyFire,
+    "Friendly Fire Penalty",  // PType_FriendlyFire,
     "Healing Teammate",  // PType_HealOther,
     "Reviving Teammate",  // PType_ReviveOther,
     "Defibbing Teammate",  // PType_ResurrectOther,
-    "Deploying Ammo"  // PType_DeployAmmo
+    "Deploying Ammo",  // PType_DeployAmmo
+    // NEW TYPES - Base Points:
+    "Witch Crown",  // PType_WitchCrown = 14
+    "Melee Kill",  // PType_MeleeKill = 15
+    "Pills Used",  // PType_PillUse = 16
+    "Adrenaline Used",  // PType_AdrenalineUse = 17
+    "Molotov Used",  // PType_MolotovUse = 18
+    "Pipe Bomb Used",  // PType_PipeUse = 19
+    "Bile Bomb Used",  // PType_BileUse = 20
+    "Tank Damage",  // PType_TankDamage = 21
+    "Cleared Pinned Teammate",  // PType_ClearPinned = 22
+    "Smoker Self Clear",  // PType_SmokerSelfClear = 23
+    "Hunter Deadstop",  // PType_HunterDeadstop = 24
+    "Boomer Bile Hit",  // PType_BoomerBileHit = 25
+    // NEW TYPES - Penalties:
+    "Death Penalty",  // PType_Death = 26
+    "Car Alarm Penalty",  // PType_CarAlarm = 27
+    "Pinned Penalty",  // PType_TimesPinned = 28
+    "Tank Rock Hit Penalty",  // PType_TankRockHit = 29
+    "Clown Honk Penalty",  // PType_ClownHonk = 30
+    "Boomer Bile Self Penalty",  // PType_BoomerBileSelf = 31
+    "Teammate Kill Penalty"  // PType_TeammateKill = 32
   ]
   export default {
     metaInfo() {
@@ -78,6 +99,27 @@
         },
         getPointType(type) {
           return POINT_TYPE_DISPLAY[type] ?? type
+        },
+        getActionDescription(row) {
+          const baseType = this.getPointType(row.type);
+          
+          // Add specific descriptions for friendly fire based on amount
+          if (row.type === 9) { // PType_FriendlyFire
+            switch(row.amount) {
+              case -500:
+                return "Teammate Kill";
+              case -40:
+                return "Teammate Damage (11+ HP)";
+              case -20:
+                return "Teammate Damage (6-10 HP)";
+              case -10:
+                return "Teammate Damage (1-5 HP)";
+              default:
+                return baseType;
+            }
+          }
+          
+          return baseType;
         },
         formatDate(date) {
           const d = new Date(date * 1000)

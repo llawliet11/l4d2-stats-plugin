@@ -1,6 +1,10 @@
 import Router from 'express'
 const router = Router()
 import routeCache from 'route-cache'
+import fs from 'fs'
+import path from 'path'
+import PointCalculator from '../services/PointCalculator.js'
+import { addKillsAllSpecials } from '../utils/dataHelpers.js'
 
 import Canvas from 'canvas'
 
@@ -8,17 +12,36 @@ Canvas.registerFont('./assets/fonts/OpenSans-Light.ttf', { family: 'OpenSans', w
 Canvas.registerFont('./assets/fonts/micross.ttf', { family: 'MS-Sans-Serif' })
 Canvas.registerFont('./assets/fonts/Roboto-Bold.ttf', { family: 'Roboto', weight: 'Bold'})
 
-import GameData from '../assets/gameinfo.json' assert { type: "json" };
+import GameData from '../assets/gameinfo.json' with { type: "json" };
 const SurvivorNames = GameData.survivors
 const WeaponNames = GameData.weapons
 const DifficultyNames = GameData.difficulties
 import { getMapName } from '../map.js'
 
+// Load calculation rules from config file
+const configPath = path.join(process.cwd(), 'config', 'calculation-rules.json')
+let calculationRules = {}
+try {
+    calculationRules = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+} catch (err) {
+    console.warn('Could not load calculation-rules.json, using defaults:', err.message)
+    calculationRules = {
+        top_weapon_calculation: { 
+            source_table: "stats_weapons_usage",
+            criteria: { field: "minutesUsed", direction: "desc" }
+        },
+        pagination: { sessions_per_page: 10, points_per_page: 50, max_per_page: 100 },
+        cache_durations: { user_top: 60, user_averages: 120, user_image: 600, user_random: 86400 },
+        query_limits: { top_session_limit: 10, minimum_session_duration: 300 }
+    }
+}
+
 export default function(pool) {
-    router.get('/random', routeCache.cacheSeconds(86400), async(req,res) => {
+    router.get('/random', routeCache.cacheSeconds(calculationRules.cache_durations?.user_random || 86400), async(req,res) => {
         try {
             const [results] = await pool.execute("SELECT * FROM `stats_users` ORDER BY RAND() LIMIT 1")
-            return res.json({user: results[0]})
+            const userWithSpecials = addKillsAllSpecials(results[0])
+            return res.json({user: userWithSpecials})
         }catch(err) {
             res.status(500).json({error:"Internal Server Error"})
         }
@@ -30,17 +53,18 @@ export default function(pool) {
             let bits = req.params.user.split(":")
             bits = bits[bits.length - 1]
             const [rows] = await pool.query(
-                "SELECT * FROM `stats_users` WHERE STRCMP(`last_alias`,?) = 0 OR `steamid` LIKE CONCAT('STEAM_%:%:', ?)", 
+                "SELECT * FROM `stats_users` WHERE STRCMP(`last_alias`,?) = 0 OR `steamid` LIKE CONCAT('STEAM_%:%:', ?)",
                 [user, bits]
             )
             if(rows.length > 0) {
+                const userWithSpecials = addKillsAllSpecials(rows[0])
                 res.json({
-                    user:rows[0],
+                    user: userWithSpecials,
                 })
             }else{
-                res.json({ 
-                    user: null, 
-                    not_found: true 
+                res.json({
+                    user: null,
+                    not_found: true
                 })
             }
         }catch(err) {
@@ -127,15 +151,16 @@ export default function(pool) {
         }
     })
     //TODO: points system
-    router.get('/:user/top', routeCache.cacheSeconds(60), async(req,res) => {
+    router.get('/:user/top', routeCache.cacheSeconds(calculationRules.cache_durations?.user_top || 60), async(req,res) => {
         try {
             const userInfo = await getUserStats(req.params.user)
-            const [top_session] = await pool.execute("SELECT *, map, date_end - date_start as difference FROM stats_games WHERE date_end > 0 AND date_start > 0 AND steamid = ? ORDER BY difference ASC LIMIT 10", [req.params.user])
+            const topSessionLimit = calculationRules.query_limits?.top_session_limit || 10
+            const [top_session] = await pool.execute("SELECT *, map, date_end - date_start as difference FROM stats_games WHERE date_end > 0 AND date_start > 0 AND steamid = ? ORDER BY difference ASC LIMIT ?", [req.params.user, topSessionLimit])
             res.json({
                 topMap: userInfo.top.map,
                 topCharacter: userInfo.top.character,
                 topWeapon: userInfo.top.weapon.name,
-                bestSessionByTime: top_session.length > 0 ? top_session.find(session => session.difference > 300) : null,
+                bestSessionByTime: top_session.length > 0 ? top_session.find(session => session.difference > (calculationRules.query_limits?.minimum_session_duration || 300)) : null,
                 mapsPlayed: {
                     custom: userInfo.maps.custom,
                     official: userInfo.maps.official,
@@ -151,8 +176,8 @@ export default function(pool) {
  
     router.get('/:user/points/:page', async (req,res) => {
         try {
-            let perPage = parseInt(req.query.perPage) || 50;
-            if(perPage > 100) perPage = 100;
+            let perPage = parseInt(req.query.perPage) || calculationRules.pagination?.points_per_page || 50;
+            if(perPage > (calculationRules.pagination?.max_per_page || 100)) perPage = calculationRules.pagination?.max_per_page || 100;
             const selectedPage = req.params.page || 0
             const pageNumber = (isNaN(selectedPage) || selectedPage <= 0) ? 0 : (parseInt(selectedPage) - 1);
             const offset = pageNumber * perPage;
@@ -167,10 +192,98 @@ export default function(pool) {
             res.status(500).json({error:'Internal Server Error'})
         }
     })
+
+    // Calculate overall user points based on stats_users data
+    router.get('/:user/points/calculate', routeCache.cacheSeconds(120), async (req, res) => {
+        try {
+            const steamid = req.params.user;
+
+            // Get user data from stats_users table
+            const [users] = await pool.execute(
+                'SELECT * FROM stats_users WHERE steamid = ?',
+                [steamid]
+            );
+
+            if (users.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            const userData = addKillsAllSpecials(users[0]);
+            const pointCalculator = new PointCalculator();
+            const breakdown = pointCalculator.calculateUserPoints(userData);
+
+            res.json({
+                success: true,
+                steamid: userData.steamid,
+                calculation_type: 'user_overall',
+                breakdown: breakdown,
+                user_data: {
+                    steamid: userData.steamid,
+                    last_alias: userData.last_alias,
+                    points: userData.points,
+                    minutes_played: userData.minutes_played
+                }
+            });
+        } catch (error) {
+            console.error('[/api/user/:user/points/calculate] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to calculate user points',
+                error: error.message
+            });
+        }
+    })
+
+    // Calculate MVP points for overall user statistics
+    router.get('/:user/mvp/calculate', routeCache.cacheSeconds(120), async (req, res) => {
+        try {
+            const steamid = req.params.user;
+
+            // Get user data from stats_users table
+            const [users] = await pool.execute(
+                'SELECT * FROM stats_users WHERE steamid = ?',
+                [steamid]
+            );
+
+            if (users.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            const userData = users[0];
+            const pointCalculator = new PointCalculator();
+            const breakdown = pointCalculator.calculateMVPPoints(userData, 'overall');
+
+            res.json({
+                success: true,
+                steamid: userData.steamid,
+                calculation_type: 'mvp_overall',
+                breakdown: breakdown,
+                user_data: {
+                    steamid: userData.steamid,
+                    last_alias: userData.last_alias,
+                    points: userData.points,
+                    minutes_played: userData.minutes_played
+                }
+            });
+        } catch (error) {
+            console.error('[/api/user/:user/mvp/calculate] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to calculate MVP points',
+                error: error.message
+            });
+        }
+    })
     router.get('/:user/sessions/:page', async (req, res) => {
         try {
-            let perPage = parseInt(req.query.perPage) || 10;
-            if(perPage > 100) perPage = 100;
+            let perPage = parseInt(req.query.perPage) || calculationRules.pagination?.sessions_per_page || 10;
+            if(perPage > (calculationRules.pagination?.max_per_page || 100)) perPage = calculationRules.pagination?.max_per_page || 100;
             const selectedPage = req.params.page || 0
             const pageNumber = (isNaN(selectedPage) || selectedPage <= 0) ? 0 : (parseInt(selectedPage) - 1);
             const offset = pageNumber * perPage;
@@ -185,11 +298,11 @@ export default function(pool) {
             res.status(500).json({error:'Internal Server Error'})
         }
     })
-    router.get('/:user/averages', routeCache.cacheSeconds(120), async(req,res) => {
+    router.get('/:user/averages', routeCache.cacheSeconds(calculationRules.cache_durations?.user_averages || 120), async(req,res) => {
         if(!req.params.user) return res.status(404).json(null)
         try {
             const [totalSessions] = await pool.execute("SELECT (SELECT COUNT(*) as count FROM stats_games WHERE steamid = ?) as count, (SELECT COUNT(*) FROM `stats_games`) AS total_sessions", [req.params.user])
-            const [stats] = await pool.execute(`SELECT steamid,last_alias,minutes_played,survivor_deaths,survivor_ff,heal_others,revived_others,survivor_incaps,minutes_idle FROM \`stats_users\` where steamid = ?`, [req.params.user])
+            const [stats] = await pool.execute(`SELECT steamid,last_alias,minutes_played,survivor_deaths,survivor_ff,COALESCE(survivor_ff_rec, 0) as survivor_ff_rec,heal_others,revived_others,survivor_incaps,minutes_idle FROM \`stats_users\` where steamid = ?`, [req.params.user])
             res.json({
                 totalSessions: totalSessions[0].count,
                 globalTotalSessions: totalSessions[0].total_sessions,
@@ -200,7 +313,7 @@ export default function(pool) {
             res.status(500).json({error:"Internal Server Error"})
         }
     })
-    router.get('/:user/image', routeCache.cacheSeconds(600), async(req, res) => {
+    router.get('/:user/image', routeCache.cacheSeconds(calculationRules.cache_durations?.user_image || 600), async(req, res) => {
         if(!req.params.user) return res.status(404).json(null)
         try {
             const { top, name, maps, stats } = await getUserStats(req.params.user)
@@ -257,19 +370,27 @@ export default function(pool) {
         ctx.fillText(value, x + twS.width, y)
     }
     async function getUserStats(user) {
-        let [row] = await pool.execute("SELECT characterType as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? AND characterType IS NOT NULL GROUP BY `characterType` ORDER BY count DESC LIMIT 1", [user]);
-        const topCharacter = row.length > 0 ? SurvivorNames[row[0].k].toLowerCase() : null;
-        [row] = await pool.execute("SELECT last_alias, witches_crowned, clowns_honked from stats_users WHERE steamid = ?", [user]);
-        const stats = row.length > 0 ? row[0] : {};
-        [row] = await pool.execute("SELECT map as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? GROUP BY `map` ORDER BY count desc", [user]);
-        const topMap = row.length > 0 ? row[0] : null;
-        [row] = await pool.execute("SELECT top_weapon as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? AND top_weapon IS NOT NULL AND top_weapon != '' GROUP BY `top_weapon` ORDER BY count DESC LIMIT 1 ", [user]);
-        const topWeapon = row.length > 0 ? (row[0]?.k).replace('weapon_','') : null;
-        [row] = await pool.execute('SELECT (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` NOT RLIKE "^c[0-9]+m") as custom,  (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` RLIKE "^c[0-9]+m") as official FROM `stats_games` LIMIT 1', [user, user]);
-        const maps = row[0] ? {
-            official: row[0].official ,
-            custom: row[0].custom,
-            total: row[0].custom + row[0].official,
+        let [row1] = await pool.execute("SELECT characterType as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? AND characterType IS NOT NULL GROUP BY `characterType` ORDER BY count DESC LIMIT 1", [user]);
+        const topCharacter = row1.length > 0 ? SurvivorNames[row1[0].k].toLowerCase() : null;
+        let [row2] = await pool.execute("SELECT last_alias, witches_crowned, clowns_honked from stats_users WHERE steamid = ?", [user]);
+        const stats = row2.length > 0 ? row2[0] : {};
+        let [row3] = await pool.execute("SELECT map as k, COUNT(*) as count FROM `stats_games` WHERE steamid = ? GROUP BY `map` ORDER BY count desc", [user]);
+        const topMap = row3.length > 0 ? row3[0] : null;
+        // Get top weapon based on config rules
+        const weaponConfig = calculationRules.top_weapon_calculation || { 
+            source_table: "stats_weapons_usage", 
+            criteria: { field: "minutesUsed", direction: "desc" } 
+        }
+        const sourceTable = weaponConfig.source_table || "stats_weapons_usage"
+        const criteria = weaponConfig.criteria || { field: "minutesUsed", direction: "desc" }
+        
+        let [row4] = await pool.execute(`SELECT weapon as k, ${criteria.field} FROM \`${sourceTable}\` WHERE steamid = ? ORDER BY ${criteria.field} ${criteria.direction} LIMIT 1`, [user]);
+        const topWeapon = row4.length > 0 ? (row4[0]?.k).replace('weapon_','') : null;
+        let [row5] = await pool.execute('SELECT (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` NOT RLIKE "^c[0-9]+m") as custom,  (SELECT COUNT(*) FROM `stats_games` WHERE `steamid` = ? AND `map` RLIKE "^c[0-9]+m") as official FROM `stats_games` LIMIT 1', [user, user]);
+        const maps = row5[0] ? {
+            official: row5[0].official ,
+            custom: row5[0].custom,
+            total: row5[0].custom + row5[0].official,
         } : { official: 0, custom: 0, total: 0 }
         return {
             top: {

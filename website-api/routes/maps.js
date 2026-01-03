@@ -1,6 +1,8 @@
 import Router from 'express'
 const router = Router()
 import routeCache from 'route-cache'
+import PointCalculator from '../services/PointCalculator.js'
+import { addKillsAllSpecials } from '../utils/dataHelpers.js'
 
 export default function(pool) {
     router.get('/', routeCache.cacheSeconds(120), async (req, res) => {
@@ -64,6 +66,148 @@ export default function(pool) {
             avgRating: sum / rows.length,
             ratings
         })
+    })
+
+    // Calculate map-specific points for a user based on stats_map_users data
+    router.get('/:mapid/users/:steamid/points/calculate', routeCache.cacheSeconds(120), async (req, res) => {
+        try {
+            const mapid = req.params.mapid;
+            const steamid = req.params.steamid;
+            const sessionStart = req.query.session_start; // Optional: specific session timestamp
+
+            // Verify map exists
+            const [maps] = await pool.execute(
+                'SELECT name, chapter_count FROM map_info WHERE mapid = ?',
+                [mapid]
+            );
+
+            if (maps.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Map not found'
+                });
+            }
+
+            // Get map-specific user data from stats_map_users table
+            let query, params;
+            if (sessionStart) {
+                // Get specific session
+                query = 'SELECT * FROM stats_map_users WHERE steamid = ? AND mapid = ? AND session_start = ?';
+                params = [steamid, mapid, sessionStart];
+            } else {
+                // Get most recent session for this user on this map
+                query = 'SELECT * FROM stats_map_users WHERE steamid = ? AND mapid = ? ORDER BY session_start DESC LIMIT 1';
+                params = [steamid, mapid];
+            }
+
+            const [mapUserData] = await pool.execute(query, params);
+
+            if (mapUserData.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'No session data found for this user on this map'
+                });
+            }
+
+            const userData = addKillsAllSpecials(mapUserData[0]);
+            const pointCalculator = new PointCalculator();
+            const breakdown = pointCalculator.calculateMapPoints(userData);
+
+            res.json({
+                success: true,
+                steamid: userData.steamid,
+                mapid: userData.mapid,
+                calculation_type: 'map_specific',
+                breakdown: breakdown,
+                map_data: {
+                    steamid: userData.steamid,
+                    mapid: userData.mapid,
+                    map_name: maps[0].name,
+                    last_alias: userData.last_alias,
+                    points: userData.points,
+                    session_start: userData.session_start,
+                    session_end: userData.session_end
+                }
+            });
+        } catch (error) {
+            console.error('[/api/maps/:mapid/users/:steamid/points/calculate] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to calculate map-specific points',
+                error: error.message
+            });
+        }
+    })
+
+    // Calculate MVP points for map-specific user statistics
+    router.get('/:mapid/users/:steamid/mvp/calculate', routeCache.cacheSeconds(120), async (req, res) => {
+        try {
+            const mapid = req.params.mapid;
+            const steamid = req.params.steamid;
+            const sessionStart = req.query.session_start; // Optional: specific session timestamp
+
+            // Verify map exists
+            const [maps] = await pool.execute(
+                'SELECT name, chapter_count FROM map_info WHERE mapid = ?',
+                [mapid]
+            );
+
+            if (maps.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Map not found'
+                });
+            }
+
+            // Get map-specific user data from stats_map_users table
+            let query, params;
+            if (sessionStart) {
+                // Get specific session
+                query = 'SELECT * FROM stats_map_users WHERE steamid = ? AND mapid = ? AND session_start = ?';
+                params = [steamid, mapid, sessionStart];
+            } else {
+                // Get most recent session for this user on this map
+                query = 'SELECT * FROM stats_map_users WHERE steamid = ? AND mapid = ? ORDER BY session_start DESC LIMIT 1';
+                params = [steamid, mapid];
+            }
+
+            const [mapUserData] = await pool.execute(query, params);
+
+            if (mapUserData.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'No session data found for this user on this map'
+                });
+            }
+
+            const userData = addKillsAllSpecials(mapUserData[0]);
+            const pointCalculator = new PointCalculator();
+            const breakdown = pointCalculator.calculateMVPPoints(userData, 'map');
+
+            res.json({
+                success: true,
+                steamid: userData.steamid,
+                mapid: userData.mapid,
+                calculation_type: 'mvp_map',
+                breakdown: breakdown,
+                map_data: {
+                    steamid: userData.steamid,
+                    mapid: userData.mapid,
+                    map_name: maps[0].name,
+                    last_alias: userData.last_alias,
+                    points: userData.points,
+                    session_start: userData.session_start,
+                    session_end: userData.session_end
+                }
+            });
+        } catch (error) {
+            console.error('[/api/maps/:mapid/users/:steamid/mvp/calculate] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to calculate map-specific MVP points',
+                error: error.message
+            });
+        }
     })
 
     return router

@@ -1,8 +1,103 @@
 import Router from 'express'
 const router = Router()
 import routeCache from 'route-cache'
+import fs from 'fs'
+import path from 'path'
+import PointCalculator from '../services/PointCalculator.js'
+import PointTransactionUpdater from '../services/PointTransactionUpdater.js'
+import { addKillsAllSpecials } from '../utils/dataHelpers.js'
 
 export default function(pool) {
+    // Point system configuration endpoint
+    router.get('/point-system', routeCache.cacheSeconds(300), async(req, res) => {
+        try {
+            const pointCalculator = new PointCalculator();
+            const config = pointCalculator.getConfig();
+
+            res.json({
+                success: true,
+                config: config,
+                version: config.version,
+                last_updated: config.last_updated
+            });
+        } catch (error) {
+            console.error('[/api/point-system] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to load point system configuration',
+                error: error.message
+            });
+        }
+    });
+
+
+
+    // Reload point system configuration
+    router.post('/point-system/reload', async(req, res) => {
+        try {
+            const pointCalculator = new PointCalculator();
+            pointCalculator.reloadConfig();
+
+            // Clear route cache to ensure fresh data
+            routeCache.removeCache('/api/point-system');
+
+            res.json({
+                success: true,
+                message: 'Point system configuration reloaded successfully',
+                version: pointCalculator.getConfig().version,
+                last_updated: pointCalculator.getConfig().last_updated
+            });
+        } catch (error) {
+            console.error('[/api/point-system/reload] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to reload point system configuration',
+                error: error.message
+            });
+        }
+    });
+
+    // Point calculation breakdown for a specific session
+    router.get('/point-breakdown/:sessionId', async(req, res) => {
+        try {
+            const sessionId = req.params.sessionId;
+
+            // Get session data
+            const [sessions] = await pool.execute(
+                'SELECT * FROM stats_games WHERE id = ?',
+                [sessionId]
+            );
+
+            if (sessions.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Session not found'
+                });
+            }
+
+            const session = sessions[0];
+            const pointCalculator = new PointCalculator();
+            const breakdown = pointCalculator.calculateSessionPoints(session);
+            const warnings = pointCalculator.validateSessionData(session);
+
+            res.json({
+                success: true,
+                session_id: sessionId,
+                steamid: session.steamid,
+                breakdown: breakdown,
+                warnings: warnings,
+                session_data: session
+            });
+        } catch (error) {
+            console.error('[/api/point-breakdown] Error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to calculate point breakdown',
+                error: error.message
+            });
+        }
+    });
+
     router.get('/info', routeCache.cacheSeconds(120), async(req,res) => {
         try {
             const [totals] = await pool.execute("SELECT (SELECT COUNT(*) FROM `stats_users`) AS total_users, (SELECT COUNT(*) FROM `stats_games`) AS total_sessions");
@@ -30,41 +125,51 @@ export default function(pool) {
 
     router.get('/totals', routeCache.cacheSeconds(300), async(req,res) => {
         try {
-            const [totals] = await pool.execute(`SELECT 
-            sum(nullif(finale_time,0)) as finale_time, 
-            sum(date_end - date_start) as game_duration,
-            sum(nullif(ZombieKills,0)) as zombie_kills, 
-            sum(nullif(SurvivorDamage,0)) as survivor_ff, 
-            sum(MedkitsUsed) as MedkitsUsed, 
-            sum(FirstAidShared) as FirstAidShared,
-            sum(PillsUsed) as PillsUsed, 
-            sum(AdrenalinesUsed) as AdrenalinesUsed,
-            sum(MolotovsUsed) as MolotovsUsed, 
-            sum(PipebombsUsed) as PipebombsUsed, 
-            sum(BoomerBilesUsed) as BoomerBilesUsed, 
-            sum(DamageTaken) as DamageTaken, 
-            sum(MeleeKills) as MeleeKills, 
-            sum(ReviveOtherCount) as ReviveOtherCount, 
-            sum(DefibrillatorsUsed) as DefibrillatorsUsed,
-            sum(Deaths) as Deaths, 
-            sum(Incaps) as Incaps, 
-            sum(nullif(boomer_kills,0)) as boomer_kills, 
-            sum(nullif(jockey_kills,0)) as jockey_kills, 
-            sum(nullif(smoker_kills,0)) as smoker_kills, 
-            sum(nullif(spitter_kills,0)) as spitter_kills, 
-            sum(nullif(hunter_kills,0)) as hunter_kills,
-            sum(nullif(charger_kills,0)) as charger_kills,
+            // Get longest individual player playtime (Total Playtime = longest play time of any single player)
+            const [longestPlaytime] = await pool.execute(`SELECT
+            max(nullif(minutes_played,0)) * 60 as longest_playtime
+            FROM stats_users`)
+
+            // Get aggregated stats from stats_users table for more accurate totals
+            const [totals] = await pool.execute(`SELECT
+            sum(nullif(common_kills,0)) as zombie_kills,
+            sum(nullif(survivor_ff,0)) as survivor_ff,
+            sum(nullif(heal_others,0)) as MedkitsUsed,
+            0 as FirstAidShared,
+            sum(nullif(pills_used,0)) as PillsUsed,
+            sum(nullif(adrenaline_used,0)) as AdrenalinesUsed,
+            sum(nullif(throws_molotov,0)) as MolotovsUsed,
+            sum(nullif(throws_pipe,0)) as PipebombsUsed,
+            sum(nullif(throws_puke,0)) as BoomerBilesUsed,
+            sum(nullif(survivor_damage_rec,0)) as DamageTaken,
+            sum(nullif(melee_kills,0)) as MeleeKills,
+            sum(nullif(revived_others,0)) as ReviveOtherCount,
+            sum(nullif(defibs_used,0)) as DefibrillatorsUsed,
+            sum(nullif(survivor_deaths,0)) as Deaths,
+            sum(nullif(survivor_incaps,0)) as Incaps,
+            sum(nullif(kills_boomer,0)) as boomer_kills,
+            sum(nullif(kills_jockey,0)) as jockey_kills,
+            sum(nullif(kills_smoker,0)) as smoker_kills,
+            sum(nullif(kills_spitter,0)) as spitter_kills,
+            sum(nullif(kills_hunter,0)) as hunter_kills,
+            sum(nullif(kills_charger,0)) as charger_kills,
             (SELECT COUNT(*) FROM \`stats_games\`) AS total_sessions,
             (SELECT COUNT(distinct(campaignID)) from stats_games) AS total_games,
             (SELECT COUNT(*) FROM \`stats_users\`) AS total_users
-            FROM stats_games WHERE date_start > 0`)
+            FROM stats_users`)
+
+            // Combine longest playtime with other stats
+            const combinedStats = {
+                ...totals[0],
+                game_duration: longestPlaytime[0]?.longest_playtime || 0
+            }
             const [mapTotals] = await pool.execute("SELECT map,COUNT(*) as count FROM stats_games GROUP BY map ORDER BY COUNT(map) DESC")
             if(totals.length == 0) {
                 return res.status(500).json({error:'Internal Server Error'})
             }else{
                 let stats = {}, maps = {};
-                for(const key in totals[0]) {
-                    stats[key] = parseInt(totals[0][key])
+                for(const key in combinedStats) {
+                    stats[key] = parseInt(combinedStats[key])
                 }
                 mapTotals.forEach(({map,count}) => {
                     maps[map] = count;
@@ -83,33 +188,43 @@ export default function(pool) {
         try {
             const [maps] = await pool.execute("SELECT map FROM stats_games WHERE map RLIKE \"^c[0-9]m\" GROUP BY map ORDER BY COUNT(map) DESC")
             const [userCount] = await pool.execute("SELECT AVG(games.players) as avgPlayers FROM (SELECT COUNT(campaignID) as players FROM stats_games GROUP BY `campaignID`) as games")
-            const [topStats] = await pool.execute(`SELECT 
-            avg(nullif(finale_time,0)) as finale_time, 
-            avg(date_end - date_start) as game_duration,
-            avg(nullif(ZombieKills,0)) as zombie_kills, 
-            avg(nullif(SurvivorDamage,0)) as survivor_ff, 
-            avg(MedkitsUsed) as MedkitsUsed, 
-            avg(FirstAidShared) as FirstAidShared,
-            avg(PillsUsed) as PillsUsed, 
-            avg(AdrenalinesUsed) as AdrenalinesUsed,
-            avg(MolotovsUsed) as MolotovsUsed, 
-            avg(PipebombsUsed) as PipebombsUsed, 
-            avg(BoomerBilesUsed) as BoomerBilesUsed, 
-            avg(DamageTaken) as DamageTaken, 
-            avg(difficulty) as difficulty, 
-            avg(MeleeKills) as MeleeKills, 
-            avg(ping) as ping, 
-            avg(ReviveOtherCount) as ReviveOtherCount, 
-            avg(DefibrillatorsUsed) as DefibrillatorsUsed,
-            avg(Deaths) as Deaths, 
-            avg(Incaps) as Incaps, 
-            avg(nullif(boomer_kills,0)) as boomer_kills, 
-            avg(nullif(jockey_kills,0)) as jockey_kills, 
-            avg(nullif(smoker_kills,0)) as smoker_kills, 
-            avg(nullif(spitter_kills,0)) as spitter_kills, 
-            avg(nullif(hunter_kills,0)) as hunter_kills,
-            avg(nullif(charger_kills,0)) as charger_kills
-            FROM stats_games WHERE date_start > 0`)
+
+            // Get average session duration from stats_games (actual campaign session times)
+            const [avgSessionDuration] = await pool.execute(`SELECT
+            avg(CASE WHEN date_end > 0 AND date_start > 0 THEN date_end - date_start ELSE 0 END) as avg_session_duration
+            FROM (
+                SELECT campaignID, MAX(date_end) as date_end, MIN(date_start) as date_start
+                FROM stats_games
+                WHERE date_end > 0 AND date_start > 0
+                GROUP BY campaignID
+            ) as sessions`)
+
+            // Get average stats from stats_users table for more accurate averages
+            const [topStats] = await pool.execute(`SELECT
+            avg(nullif(common_kills,0)) as zombie_kills,
+            avg(nullif(survivor_ff,0)) as survivor_ff,
+            avg(nullif(heal_others,0)) as MedkitsUsed,
+            0 as FirstAidShared,
+            avg(nullif(pills_used,0)) as PillsUsed,
+            avg(nullif(adrenaline_used,0)) as AdrenalinesUsed,
+            avg(nullif(throws_molotov,0)) as MolotovsUsed,
+            avg(nullif(throws_pipe,0)) as PipebombsUsed,
+            avg(nullif(throws_puke,0)) as BoomerBilesUsed,
+            avg(nullif(survivor_damage_rec,0)) as DamageTaken,
+            2 as difficulty,
+            avg(nullif(melee_kills,0)) as MeleeKills,
+            0 as ping,
+            avg(nullif(revived_others,0)) as ReviveOtherCount,
+            avg(nullif(defibs_used,0)) as DefibrillatorsUsed,
+            avg(nullif(survivor_deaths,0)) as Deaths,
+            avg(nullif(survivor_incaps,0)) as Incaps,
+            avg(nullif(kills_boomer,0)) as boomer_kills,
+            avg(nullif(kills_jockey,0)) as jockey_kills,
+            avg(nullif(kills_smoker,0)) as smoker_kills,
+            avg(nullif(kills_spitter,0)) as spitter_kills,
+            avg(nullif(kills_hunter,0)) as hunter_kills,
+            avg(nullif(kills_charger,0)) as charger_kills
+            FROM stats_users`)
             let stats = {};
             if(topStats[0]) {
                 for(const key in topStats[0]) {
@@ -119,6 +234,8 @@ export default function(pool) {
                         stats[key] = parseFloat(topStats[0][key])
                     }
                 }
+                // Add the correct session duration
+                stats.game_duration = avgSessionDuration[0]?.avg_session_duration || 0;
             }
             res.json({
                 topMap: maps.length > 0 ? maps[0].map : null,
@@ -131,5 +248,416 @@ export default function(pool) {
             res.status(500).json({error:'Internal Server Error'})
         }
     })
+
+    // New endpoint for database health check
+    router.get('/health', routeCache.cacheSeconds(60), async(req,res) => {
+        try {
+            const [userStats] = await pool.execute(`
+                SELECT
+                    COUNT(*) as total_users,
+                    COUNT(CASE WHEN minutes_played > 0 THEN 1 END) as active_users,
+                    AVG(CASE WHEN minutes_played > 0 THEN minutes_played END) as avg_playtime,
+                    MAX(last_join_date) as last_activity
+                FROM stats_users
+            `);
+
+            const [sessionStats] = await pool.execute(`
+                SELECT
+                    COUNT(*) as total_sessions,
+                    COUNT(CASE WHEN date_end > 0 AND date_start > 0 THEN 1 END) as valid_sessions,
+                    AVG(CASE WHEN date_end > 0 AND date_start > 0 THEN (date_end - date_start) / 60 END) as avg_session_minutes
+                FROM stats_games
+            `);
+
+            res.json({
+                status: 'healthy',
+                users: userStats[0],
+                sessions: sessionStats[0],
+                timestamp: new Date().toISOString()
+            });
+        } catch(err) {
+            console.error('[/api/health]', err.message);
+            res.status(500).json({
+                status: 'unhealthy',
+                error: 'Database connection failed',
+                timestamp: new Date().toISOString()
+            });
+        }
+    })
+
+    // Legacy endpoint - redirect to new point-system endpoint
+    router.get('/point-rules', routeCache.cacheSeconds(300), async(req,res) => {
+        try {
+            const pointCalculator = new PointCalculator();
+            const config = pointCalculator.getConfig();
+
+            // Convert new format to legacy format for backward compatibility
+            const legacyFormat = {
+                point_values: {
+                    positive_actions: {},
+                    penalties: {}
+                },
+                calculation_rules: config.calculation_settings
+            };
+
+            // Convert base points to legacy format
+            for (const [key, rule] of Object.entries(config.base_points.rules)) {
+                if (rule.enabled !== false) {
+                    const multiplier = rule.points_per_kill || rule.points_per_headshot ||
+                                     rule.points_per_damage || rule.points_per_heal ||
+                                     rule.points_per_revive || rule.points_per_defib ||
+                                     rule.points_per_crown || rule.points_per_save ||
+                                     rule.points_per_pack || rule.points || 1;
+                    legacyFormat.point_values.positive_actions[key] = multiplier;
+                }
+            }
+
+            // Convert penalties to legacy format
+            for (const [key, rule] of Object.entries(config.penalties.rules)) {
+                if (rule.enabled !== false) {
+                    const multiplier = rule.points_per_damage || rule.points_per_kill || rule.points_per_death || 0;
+                    legacyFormat.point_values.penalties[key] = multiplier;
+                }
+            }
+
+            res.json({
+                success: true,
+                rules: legacyFormat,
+                note: "This endpoint is deprecated. Use /api/point-system for the new format."
+            });
+        } catch(err) {
+            console.error('[/api/point-rules]', err.message);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to load point calculation rules',
+                message: err.message
+            });
+        }
+    });
+
+    // Recalculate all user points based on current rules
+    router.post('/recalculate', async(req,res) => {
+        try {
+            console.log('[/api/recalculate] Starting point recalculation...');
+
+            // Parse request options
+            const {
+                mode = 'full',
+                update_transactions = false,
+                backup_original = true,
+                user_filter = null,
+                dry_run = false,
+                force_version_update = true
+            } = req.body;
+
+            console.log('[/api/recalculate] Options:', { mode, update_transactions, backup_original, user_filter, dry_run, force_version_update });
+
+            // Initialize point calculator with new system
+            const pointCalculator = new PointCalculator();
+            console.log('[/api/recalculate] Loaded point system configuration');
+
+            let transactionUpdateStats = null;
+
+            // Step 1: Update point transactions if requested
+            if (update_transactions) {
+                console.log('[/api/recalculate] Starting point transaction updates...');
+                const transactionUpdater = new PointTransactionUpdater(pool);
+
+                const updateResult = await transactionUpdater.updatePointTransactions({
+                    userFilter: user_filter,
+                    backupOriginal: backup_original,
+                    dryRun: dry_run,
+                    batchSize: 1000,
+                    forceVersionUpdate: force_version_update
+                });
+
+                if (!updateResult.success) {
+                    return res.status(500).json({
+                        success: false,
+                        error: 'Failed to update point transactions',
+                        message: updateResult.error,
+                        stats: updateResult.stats
+                    });
+                }
+
+                transactionUpdateStats = updateResult.stats;
+                console.log('[/api/recalculate] Point transaction updates completed:', transactionUpdateStats);
+            }
+            
+            // Note: kills_all_specials column has been dropped from database
+            // It will be calculated on-the-fly in API responses
+            console.log('[/api/recalculate] Skipping kills_all_specials update (calculated on-the-fly)');
+            
+            // Get all users from stats_users table
+            const [users] = await pool.execute(`
+                SELECT * FROM stats_users 
+                ORDER BY steamid ASC
+            `);
+            
+            console.log(`[/api/recalculate] Processing ${users.length} users...`);
+            
+            if (users.length === 0) {
+                return res.json({
+                    success: false,
+                    message: 'No users found to process',
+                    stats: { users_processed: 0 }
+                });
+            }
+            
+            let processedCount = 0;
+            let totalPointsCalculated = 0;
+            const batchSize = 100;
+
+            for (let i = 0; i < users.length; i += batchSize) {
+                const batch = users.slice(i, i + batchSize);
+
+                for (const user of batch) {
+                    // Add calculated kills_all_specials field before point calculation
+                    const userWithSpecials = addKillsAllSpecials(user);
+
+                    // Calculate points using new point system based on user's cumulative stats
+                    const pointBreakdown = pointCalculator.calculateSessionPoints(userWithSpecials);
+                    let points = pointBreakdown.total;
+
+                    // Validate user data
+                    const warnings = pointCalculator.validateSessionData(user);
+                    if (warnings.length > 0) {
+                        console.warn(`User ${user.steamid} validation warnings:`, warnings);
+                    }
+
+                    // Track total points calculated
+                    totalPointsCalculated += points;
+
+                    // Update user points directly in stats_users table
+                    await pool.execute(
+                        "UPDATE stats_users SET points = ? WHERE steamid = ?",
+                        [points, user.steamid]
+                    );
+
+                    // Debug log for first few users
+                    if (processedCount < 5) {
+                        console.log(`[/api/recalculate] User ${processedCount + 1}: ${user.steamid} calculated ${points} points`);
+                        console.log(`  - Common Kills: ${user.common_kills || 0}, Special Kills: ${user.kills_all_specials || 0}`);
+                        console.log(`  - FF Damage: ${user.survivor_ff || 0}, Finales Won: ${user.finales_won || 0}`);
+                    }
+
+                    processedCount++;
+                }
+
+                // Log progress every batch
+                console.log(`[/api/recalculate] Processed ${Math.min(i + batchSize, users.length)}/${users.length} users`);
+            }
+
+            // Recalculate points for stats_map_users table
+            console.log('[/api/recalculate] Starting map-specific points recalculation...');
+
+            // Get all map-user combinations from stats_map_users table
+            const [mapUsers] = await pool.execute(`
+                SELECT * FROM stats_map_users
+                ORDER BY steamid, mapid ASC
+            `);
+
+            console.log(`[/api/recalculate] Processing ${mapUsers.length} map-user combinations...`);
+
+            let mapProcessedCount = 0;
+            let totalMapPointsCalculated = 0;
+            const mapBatchSize = 50; // Smaller batch size for map calculations
+
+            for (let i = 0; i < mapUsers.length; i += mapBatchSize) {
+                const mapBatch = mapUsers.slice(i, i + mapBatchSize);
+
+                for (const mapUser of mapBatch) {
+                    try {
+                        // Add calculated kills_all_specials field before point calculation
+                        const mapUserWithSpecials = addKillsAllSpecials(mapUser);
+
+                        // Calculate map-specific points using PointCalculator
+                        const mapPointBreakdown = pointCalculator.calculateMapPoints(mapUserWithSpecials);
+                        let mapPoints = mapPointBreakdown.total;
+
+                        // Track total map points calculated
+                        totalMapPointsCalculated += mapPoints;
+
+                        // Update map-user points in stats_map_users table
+                        await pool.execute(
+                            "UPDATE stats_map_users SET points = ? WHERE steamid = ? AND mapid = ?",
+                            [mapPoints, mapUser.steamid, mapUser.mapid]
+                        );
+
+                        // Debug log for first few map-users
+                        if (mapProcessedCount < 3) {
+                            console.log(`[/api/recalculate] Map-User ${mapProcessedCount + 1}: ${mapUser.steamid} on ${mapUser.mapid} calculated ${mapPoints} points`);
+                        }
+
+                        mapProcessedCount++;
+                    } catch (error) {
+                        console.error(`[/api/recalculate] Error calculating points for ${mapUser.steamid} on ${mapUser.mapid}:`, error.message);
+                        // Continue processing other map-users even if one fails
+                        mapProcessedCount++;
+                    }
+                }
+
+                // Log map progress every batch
+                console.log(`[/api/recalculate] Processed ${Math.min(i + mapBatchSize, mapUsers.length)}/${mapUsers.length} map-user combinations`);
+            }
+
+            console.log(`[/api/recalculate] Map-specific points recalculation completed. Processed ${mapProcessedCount} combinations, total points: ${totalMapPointsCalculated}`);
+            
+            // Get final stats for both tables
+            const [finalStats] = await pool.execute(`
+                SELECT
+                    COUNT(*) as total_users,
+                    SUM(points) as total_points,
+                    AVG(points) as avg_points,
+                    MAX(points) as max_points
+                FROM stats_users
+                WHERE points > 0
+            `);
+
+            const [finalMapStats] = await pool.execute(`
+                SELECT
+                    COUNT(*) as total_map_users,
+                    SUM(points) as total_map_points,
+                    AVG(points) as avg_map_points,
+                    MAX(points) as max_map_points
+                FROM stats_map_users
+                WHERE points > 0
+            `);
+
+            console.log('[/api/recalculate] Recalculation completed successfully');
+
+            // Prepare response message
+            let message = 'Points recalculated successfully for both overall and map-specific statistics';
+            if (transactionUpdateStats) {
+                message += `. Point transactions updated: ${transactionUpdateStats.updated_transactions} changed, ${transactionUpdateStats.unchanged_transactions} unchanged`;
+                if (transactionUpdateStats.version_updated_transactions > 0) {
+                    message += `, ${transactionUpdateStats.version_updated_transactions} version-only updates`;
+                }
+            }
+
+            res.json({
+                success: true,
+                message: message,
+                stats: {
+                    users_processed: processedCount,
+                    total_points_calculated: totalPointsCalculated,
+                    map_users_processed: mapProcessedCount,
+                    total_map_points_calculated: totalMapPointsCalculated,
+                    overall_stats: finalStats[0],
+                    map_stats: finalMapStats[0],
+                    transaction_updates: transactionUpdateStats
+                }
+            });
+            
+        } catch(err) {
+            console.error('[/api/recalculate]', err.message);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to recalculate points',
+                message: err.message
+            });
+        }
+    });
+
+    // Point transaction update endpoint (for testing and manual updates)
+    router.post('/point-transactions/update', async(req, res) => {
+        try {
+            const {
+                user_filter = null,
+                backup_original = true,
+                dry_run = false,
+                batch_size = 1000,
+                force_version_update = true
+            } = req.body;
+
+            console.log('[/api/point-transactions/update] Starting point transaction update...');
+            console.log('[/api/point-transactions/update] Options:', { user_filter, backup_original, dry_run, batch_size, force_version_update });
+
+            const transactionUpdater = new PointTransactionUpdater(pool);
+
+            // Get current stats before update
+            const beforeStats = await transactionUpdater.getTransactionStats(user_filter);
+
+            // Perform the update
+            const updateResult = await transactionUpdater.updatePointTransactions({
+                userFilter: user_filter,
+                backupOriginal: backup_original,
+                dryRun: dry_run,
+                batchSize: batch_size,
+                forceVersionUpdate: force_version_update
+            });
+
+            if (!updateResult.success) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to update point transactions',
+                    message: updateResult.error,
+                    stats: updateResult.stats
+                });
+            }
+
+            // Get stats after update
+            const afterStats = await transactionUpdater.getTransactionStats(user_filter);
+
+            res.json({
+                success: true,
+                message: dry_run ? 'Dry run completed - no changes made' : 'Point transactions updated successfully',
+                dry_run: dry_run,
+                before_stats: beforeStats,
+                after_stats: afterStats,
+                update_stats: updateResult.stats
+            });
+
+        } catch (error) {
+            console.error('[/api/point-transactions/update] Error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update point transactions',
+                message: error.message
+            });
+        }
+    });
+
+    // Point transaction statistics endpoint
+    router.get('/point-transactions/stats', async(req, res) => {
+        try {
+            const { user_filter = null } = req.query;
+
+            const transactionUpdater = new PointTransactionUpdater(pool);
+            const stats = await transactionUpdater.getTransactionStats(user_filter);
+
+            // Get type distribution
+            const typeQuery = `
+                SELECT
+                    type,
+                    COUNT(*) as count,
+                    SUM(amount) as total_points,
+                    AVG(amount) as avg_points,
+                    COUNT(CASE WHEN original_amount IS NOT NULL THEN 1 END) as backed_up_count
+                FROM stats_points
+                ${user_filter ? 'WHERE steamid = ?' : ''}
+                GROUP BY type
+                ORDER BY type
+            `;
+
+            const [typeDistribution] = await pool.execute(typeQuery, user_filter ? [user_filter] : []);
+
+            res.json({
+                success: true,
+                overall_stats: stats,
+                type_distribution: typeDistribution,
+                user_filter: user_filter
+            });
+
+        } catch (error) {
+            console.error('[/api/point-transactions/stats] Error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to get transaction statistics',
+                message: error.message
+            });
+        }
+    });
+
     return router;
 }

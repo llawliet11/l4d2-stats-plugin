@@ -119,6 +119,10 @@
                       <td class="tvalue">{{user.common_kills | formatNumber}}</td>
                   </tr>
                   <tr>
+                      <td>Common Headshots</td>
+                      <td class="tvalue">{{user.common_headshots | formatNumber}}</td>
+                  </tr>
+                  <tr>
                       <td>With Minigun</td>
                       <td class="tvalue">{{user.kills_minigun | formatNumber}}</td>
                   </tr>
@@ -180,7 +184,7 @@
                 </tr>
                 <tr>
                     <td>Friendly Fire Received</td>
-                    <td class="tvalue">{{user.survivor_ff_recv | formatNumber}}</td>
+                    <td class="tvalue">{{user.survivor_ff_rec | formatNumber}}</td>
                 </tr>
                 <tr>
                     <td>With Melee</td>
@@ -371,7 +375,7 @@
                 <td>Friendly Fire</td>
                 <td class="tvalue">{{averages.survivor_ff | formatNumber}}</td>
                 <td class="tvalue">{{(averages.survivor_ff / averages.totalSessions).toFixed(2)}}</td>
-                <td class="tvalue">{{(averages.survivor_ff / averages.minutes_played).toFixed(5)}}</td>
+                <td class="tvalue">{{(averages.survivor_ff / hoursPlayed).toFixed(5)}}</td>
                 <td class="tvalue">{{(averages.survivor_ff / averages.globalTotalSessions).toFixed(2)}}</td>
             </tr>
             <tr>
@@ -399,7 +403,7 @@
                 <td>Minutes Spent Idle</td>
                 <td class="tvalue">{{averages.minutes_idle | formatNumber}}</td>
                 <td class="tvalue">{{(averages.minutes_idle / averages.totalSessions).toFixed(2)}}</td>
-                <td class="tvalue">{{(averages.minutes_idle / hoursPlayed).toFixed(5)}}</td>
+                <td class="tvalue">{{(averages.minutes_idle / hoursPlayed).toFixed(2)}}</td>
                 <td class="tvalue">{{(averages.minutes_idle / averages.globalTotalSessions).toFixed(2)}}</td>
             </tr>
             </tbody>
@@ -606,7 +610,7 @@ export default {
         // fetchPlaystyle() {
         //     this.playstyle.data = null
         //     this.playstyle.error = null
-        //     this.$http.get(`https://jackz.me/l4d2/scripts/analyze.php?steamid=${this.user.steamid}&concise=1`)
+        //     // this.$http.get(`https://your-domain/l4d2/scripts/analyze.php?steamid=${this.user.steamid}&concise=1`)
         //     .then(res => {
         //         if(res.data.result)
         //           return this.playstyle.data = `${res.data.result.name} (${Math.round(res.data.result.value * 10000) / 10000})`
@@ -630,7 +634,7 @@ export default {
         //     this.playrating.data = null
         //     this.playrating.error = null
         //     const url = process.env.NODE_ENV === "production"
-        //         ? "https://admin.jackz.me/api/analyze/"
+        //         ? "https://your-domain/api/analyze/"
         //         : "http://localhost:8081/api/analyze/"
         //     this.$http.get(`${url}${this.user.steamid}`)
         //     .then(res => {

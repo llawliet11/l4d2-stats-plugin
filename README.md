@@ -211,5 +211,14 @@ docker-compose exec mariadb sh -c 'exec mysqldump -uroot -p"$MARIADB_ROOT_PASSWO
 cat backup.sql | docker-compose exec -T mariadb sh -c 'exec mysql -uroot -p"$MARIADB_ROOT_PASSWORD" left4dead2'
 ```
 
+## Documentation
+
+For detailed setup and development information, see:
+
+- [Docker Setup Guide](docs/DOCKER-SETUP.md) - Complete Docker environment setup instructions
+- [Enhancement Improvements](docs/ENHANCEMENT_IMPROVEMENTS.md) - Recent improvements and fixes
+- [Homepage Points Fix](docs/HOMEPAGE_POINTS_FIX.md) - Points display consistency fixes
+- [Playtime and Points Fix Report](docs/PLAYTIME_AND_POINTS_FIX_REPORT.md) - Comprehensive fix report
+
 ### Credits
 * [Jackzmc](https://github.com/Jackzmc) - Plugin and API
