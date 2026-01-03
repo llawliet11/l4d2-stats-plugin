@@ -39,7 +39,7 @@ class MVPCalculator {
                     },
                     penalties: {
                         teammate_kill: -100,
-                        ff_damage_multiplier: -30
+                        ff_damage_multiplier: -2
                     }
                 },
                 mvpCriteria: pointSystem.mvp_calculation?.ranking_criteria?.criteria || [
@@ -160,11 +160,22 @@ class MVPCalculator {
         // Sort players by MVP points to determine MVP
         const sortedPlayers = [...players].sort((a, b) => (b.mvpPoints || 0) - (a.mvpPoints || 0))
 
-        // Mark the MVP (highest MVP points)
+        // Mark the MVP (highest MVP points, but must have meaningful activity)
         if (sortedPlayers.length > 0) {
-            const mvpSteamId = sortedPlayers[0].steamid
+            // Find first player with actual activity (kills, heals, etc.)
+            const mvpCandidate = sortedPlayers.find(player => {
+                const hasActivity = (player.common_kills || 0) > 0 ||
+                    (player.special_infected_kills || 0) > 0 ||
+                    (player.heal_others || 0) > 0 ||
+                    (player.revived_others || 0) > 0 ||
+                    (player.tanks_killed || 0) > 0 ||
+                    (player.finales_won || 0) > 0
+                return hasActivity && player.mvpPoints > 0
+            })
+
+            const mvpSteamId = mvpCandidate ? mvpCandidate.steamid : null
             players.forEach(player => {
-                player.isMVP = player.steamid === mvpSteamId
+                player.isMVP = mvpSteamId && player.steamid === mvpSteamId
             })
         }
 

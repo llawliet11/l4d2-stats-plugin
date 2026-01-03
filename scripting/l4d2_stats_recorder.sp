@@ -2142,7 +2142,7 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 		if(StrEqual(name, "heal_success", true)) {
 			int subject = GetClientOfUserId(event.GetInt("subject"));
 			if(subject == client) {
-				IncrementStatOptimized(client, "heal_self", 1);
+				IncrementBothStatsOptimized(client, "heal_self", 1);
 			}else{
 				// Anti-abuse: Check heal cooldown and target health
 				int targetHealth = GetClientHealth(subject);
@@ -2180,10 +2180,10 @@ void Event_ItemUsed(Event event, const char[] name, bool dontBroadcast) {
 			players[client].RecordPoint(PType_ResurrectOther, 50);
 			IncrementBothStatsOptimized(client, "defibs_used", 1);
 		} else if(StrEqual(name, "pills_used", true)) {
-			IncrementStatOptimized(client, name, 1);
+			IncrementBothStatsOptimized(client, name, 1);
 			players[client].RecordPoint(PType_PillUse, 10);
 		} else if(StrEqual(name, "adrenaline_used", true)) {
-			IncrementStatOptimized(client, name, 1);
+			IncrementBothStatsOptimized(client, name, 1);
 			players[client].RecordPoint(PType_AdrenalineUse, 15);
 		} else{
 			IncrementStatOptimized(client, name, 1);
@@ -2281,13 +2281,13 @@ void EntityCreateCallback(int entity) {
 	int entOwner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
 	if(entOwner > 0 && entOwner <= MaxClients && !IsFakeClient(entOwner)) {
 		if(StrContains(class, "vomitjar", true) > -1) {
-			IncrementStatOptimized(entOwner, "throws_puke", 1);
+			IncrementBothStatsOptimized(entOwner, "throws_puke", 1);
 			players[entOwner].RecordPoint(PType_BileUse, 5);
 		} else if(StrContains(class, "molotov", true) > -1) {
-			IncrementStatOptimized(entOwner, "throws_molotov", 1);
+			IncrementBothStatsOptimized(entOwner, "throws_molotov", 1);
 			players[entOwner].RecordPoint(PType_MolotovUse, 5);
 		} else if(StrContains(class, "pipe_bomb", true) > -1) {
-			IncrementStatOptimized(entOwner, "throws_pipe", 1);
+			IncrementBothStatsOptimized(entOwner, "throws_pipe", 1);
 			players[entOwner].RecordPoint(PType_PipeUse, 5);
 		}
 	}
