@@ -50,17 +50,17 @@ const routes = [
     component: () => import(/* webpackChunkName: "campaignsdetails" */ '@/views/maps/Details.vue')
   },
   {
-    path: '/campaigns/:id',
-    name: 'Game',
-    component: () => import(/* webpackChunkName: "campaignsdetails" */ '@/views/campaigns/Details.vue')
-  },
-  {
     path: '/campaigns/map/:mapId',
     name: 'MapCampaignDetails',
     meta: {
       title_part: 'Map Campaign Details'
     },
     component: () => import(/* webpackChunkName: "mapcampaigndetails" */ '@/views/campaigns/MapDetails.vue')
+  },
+  {
+    path: '/campaigns/:id',
+    name: 'Game',
+    component: () => import(/* webpackChunkName: "campaignsdetails" */ '@/views/campaigns/Details.vue')
   },
   {
     path: '/campaigns',

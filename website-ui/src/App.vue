@@ -16,9 +16,6 @@
             <b-navbar-item tag="router-link" to="/summary">
                 Summary
             </b-navbar-item>
-            <b-navbar-item tag="router-link" to="/maps">
-                Campaigns
-            </b-navbar-item>
             <b-navbar-item tag="router-link" to="/campaigns">
                 Games
             </b-navbar-item>

@@ -14,28 +14,20 @@
   <div class="container is-fluid">
     <div class="columns">
       <div class="column">
-        <b-table :loading="loading"  :data="ratings">
+        <b-table :loading="loading" :data="ratings" hoverable>
             <b-table-column v-slot="props" field="map.name" label="Map">
-              <router-link :to="getCampaignDetailLink( props.row.map.id )">
+              <router-link :to="getCampaignDetailLink(props.row.map.id)">
                 <strong>{{ props.row.map.name || props.row.map.id }}</strong>
               </router-link>
             </b-table-column>
-            <b-table-column v-slot="props" field="gamesPlayed" label="Games Played">
-                {{ props.row.gamesPlayed | formatNumber }}
+            <b-table-column v-slot="props" field="chapterCount" label="Chapters" centered>
+                {{ props.row.chapterCount }} chapters
             </b-table-column>
-            <b-table-column v-slot="props" field="avgDuration" label="Average Duration">
-              {{ props.row.avgDuration }} minutes
+            <b-table-column v-slot="props" field="uniquePlayers" label="Players" centered>
+                {{ props.row.uniquePlayers | formatNumber }}
             </b-table-column>
-            <b-table-column v-slot="props" field="avgRating" label="Rating">
-              <template v-if=" props.row.avgRating">
-                <b-icon size="is-small" pack="fas" icon="star" v-for="i in Math.floor(props.row.avgRating)" :key="i" />
-                <b-icon size="is-small" pack="far" icon="star" v-for="i in 5-Math.floor( props.row.avgRating ) " :key="i+10" />
-                {{ Number(props.row.avgRating).toFixed(1) }}
-              </template>
-              <span v-else>(no ratings)</span>
-            </b-table-column>
-            <b-table-column v-slot="props" field="numRatings" label="# Ratings">
-              {{ props.row.numRatings | formatNumber  }}
+            <b-table-column v-slot="props" field="totalKills" label="Total Kills" centered>
+                {{ props.row.totalKills | formatNumber }}
             </b-table-column>
         </b-table>
       </div>
@@ -96,5 +88,19 @@ export default {
     mounted() {
         this.fetchMaps();
     },
+    filters: {
+        formatNumber(num) {
+            if (num === null || num === undefined) return '0';
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        },
+        formatDuration(minutes) {
+            if (!minutes) return '-';
+            const mins = parseFloat(minutes);
+            if (mins < 60) return `${Math.round(mins)} min`;
+            const hours = Math.floor(mins / 60);
+            const remainingMins = Math.round(mins % 60);
+            return `${hours}h ${remainingMins}m`;
+        }
+    }
 }
 </script>
