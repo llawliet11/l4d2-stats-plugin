@@ -1944,8 +1944,8 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 			players[victim].damageFFTaken += dmg;
 			players[victim].damageFFTakenCount++;
 
-			// Record individual FF damage points with variable penalty based on damage
-			int penalty = -30; // Base penalty from point-system.json
+			// Record FF damage penalty: -1 point per HP damage dealt
+			int penalty = -dmg;
 			players[attacker].RecordPoint(PType_FriendlyFire, penalty);
 
 			// Update map-specific stats with raw damage

@@ -217,7 +217,7 @@
     "description": "Point penalties for negative actions",
     "rules": {
       "friendly_fire_damage": {
-        "points_per_damage": -30,
+        "points_per_damage": -1,
         "description": "Penalty per HP damage dealt to teammates",
         "source_field": "survivor_ff",
         "type": 9
