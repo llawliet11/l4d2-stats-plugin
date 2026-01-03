@@ -1139,55 +1139,78 @@ bool EnsureMapIdExists() {
 	return strlen(game.mapId) > 0;
 }
 
-// New function to actually submit points after ensuring user exists
+#define MAX_POINTS_PER_BATCH 30
+
 void SubmitPointsNow(int client) {
-	if(players[client].pointsQueue.Length > 0) {
-		// Validate required data before building query
-		if(strlen(players[client].steamid) == 0) {
-			LogError("[l4d2_stats_recorder] Cannot submit points: SteamID is empty for client %d", client);
-			return;
-		}
-		
-		// Ensure mapId exists with fallback logic
-		if(!EnsureMapIdExists()) {
-			LogError("[l4d2_stats_recorder] Cannot submit points: Unable to determine mapId");
-			return;
-		}
-		
+	int queueLen = players[client].pointsQueue.Length;
+	if(queueLen == 0) return;
+
+	if(strlen(players[client].steamid) == 0) {
+		LogError("[l4d2_stats_recorder] Cannot submit points: SteamID is empty for client %d", client);
+		return;
+	}
+
+	if(!EnsureMapIdExists()) {
+		LogError("[l4d2_stats_recorder] Cannot submit points: Unable to determine mapId");
+		return;
+	}
+
+	char escapedSteamId[64], escapedMapId[128];
+	g_db.Escape(players[client].steamid, escapedSteamId, sizeof(escapedSteamId));
+	g_db.Escape(game.mapId, escapedMapId, sizeof(escapedMapId));
+
+	if(strlen(escapedSteamId) == 0 || strlen(escapedMapId) == 0) {
+		LogError("[l4d2_stats_recorder] Cannot submit points: escaped data is empty (steamid='%s', mapId='%s')",
+			escapedSteamId, escapedMapId);
+		return;
+	}
+
+	int batchCount = 0;
+
+	for(int startIdx = 0; startIdx < queueLen; startIdx += MAX_POINTS_PER_BATCH) {
+		int endIdx = startIdx + MAX_POINTS_PER_BATCH;
+		if(endIdx > queueLen) endIdx = queueLen;
+
 		char query[4098];
-		char escapedSteamId[64];
-		char escapedMapId[128];
-		g_db.Escape(players[client].steamid, escapedSteamId, sizeof(escapedSteamId));
-		g_db.Escape(game.mapId, escapedMapId, sizeof(escapedMapId));
+		int queryLen = 0;
 
-		// Double-check escaped strings are not empty
-		if(strlen(escapedSteamId) == 0 || strlen(escapedMapId) == 0) {
-			LogError("[l4d2_stats_recorder] Cannot submit points: escaped data is empty (steamid='%s', mapId='%s')", 
-				escapedSteamId, escapedMapId);
-			return;
-		}
+		queryLen = Format(query, sizeof(query),
+			"INSERT INTO stats_points (steamid,type,amount,timestamp,mapId) VALUES ");
 
-		Format(query, sizeof(query), "INSERT INTO stats_points (steamid,type,amount,timestamp,mapId) VALUES ");
-		for(int i = 0; i < players[client].pointsQueue.Length; i++) {
+		for(int i = startIdx; i < endIdx; i++) {
 			int type = players[client].pointsQueue.Get(i, 0);
 			int amount = players[client].pointsQueue.Get(i, 1);
 			int timestamp = players[client].pointsQueue.Get(i, 2);
-			Format(query, sizeof(query), "%s('%s',%d,%d,%d,'%s')%c",
-				query,
+
+			char entry[128];
+			Format(entry, sizeof(entry), "('%s',%d,%d,%d,'%s')%c",
 				escapedSteamId,
 				type,
 				amount,
 				timestamp,
 				escapedMapId,
-				i == players[client].pointsQueue.Length - 1 ? ';' : ',' // Semicolon on last entry
+				(i == endIdx - 1) ? ';' : ','
 			);
+
+			if(queryLen + strlen(entry) >= sizeof(query) - 1) {
+				LogError("[l4d2_stats_recorder] Query buffer would overflow at entry %d, stopping batch early", i);
+				break;
+			}
+
+			StrCat(query, sizeof(query), entry);
+			queryLen += strlen(entry);
 		}
-		
-		// Add debug logging to see the final query
-		PrintToServer("[l4d2_stats_recorder] Executing query: %s", query);
-		SQL_TQuery(g_db, DBCT_SubmitPoints, query, GetClientUserId(client), DBPrio_Low);
-		// Don't clear the queue here - wait for confirmation
+
+		if(batchCount == 0) {
+			SQL_TQuery(g_db, DBCT_SubmitPoints, query, GetClientUserId(client), DBPrio_Low);
+		} else {
+			SQL_TQuery(g_db, DBCT_SubmitPointsBatch, query, GetClientUserId(client), DBPrio_Low);
+		}
+		batchCount++;
 	}
+
+	PrintToServer("[l4d2_stats_recorder] Submitted %d points in %d batch(es) for %s",
+		queueLen, batchCount, players[client].steamid);
 }
 
 void SubmitWeaponStats(int client) {
@@ -1439,12 +1462,16 @@ void DBCT_SubmitPoints(Handle db, Handle child, const char[] error, int userid) 
 	if(db == null || child == null) {
 		LogError("[l4d2_stats_recorder] Failed to submit points: %s", error);
 		PrintToServer("[l4d2_stats_recorder] ERROR: Failed to submit points for client %d!", client);
-		// Don't clear the queue on error - retry later
 	} else {
-		// Success - clear the queue
 		if(client > 0 && IsClientInGame(client)) {
 			players[client].pointsQueue.Clear();
 		}
+	}
+}
+
+void DBCT_SubmitPointsBatch(Handle db, Handle child, const char[] error, int userid) {
+	if(db == null || child == null) {
+		LogError("[l4d2_stats_recorder] Failed to submit points batch: %s", error);
 	}
 }
 
