@@ -56,6 +56,14 @@ docker/*/data/
 # Augment AI
 .augment/
 
+# Claude Code local rules
+.claude/
+CLAUDE.local.md
+GEMINI.md
+.agent.md
+.agent/
+*.local.md
+
 # Scripts (but allow specific ones)
 *.bat
 *.sh
