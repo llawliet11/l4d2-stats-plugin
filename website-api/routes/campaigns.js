@@ -422,57 +422,58 @@ export default function(pool) {
                 });
             }
 
-            // Get all player statistics for this map
+            // Get aggregated player statistics for this map (grouped by steamid)
             const [playerStats] = await pool.query(`
                 SELECT
                     smu.steamid,
-                    smu.last_alias,
+                    MAX(smu.last_alias) as last_alias,
                     0 as points,
                     smu.mapid,
-                    smu.session_start,
-                    smu.session_end,
+                    MAX(smu.session_start) as session_start,
+                    MAX(smu.session_end) as session_end,
                     NULL as ping,
-                    -- Return actual database column names
-                    smu.common_kills,
-                    smu.melee_kills,
-                    smu.survivor_damage_rec,
-                    smu.survivor_ff,
-                    smu.survivor_ff_rec,
-                    smu.throws_molotov,
-                    smu.throws_pipe,
-                    smu.throws_puke,
-                    smu.heal_others,
-                    smu.survivor_incaps,
-                    smu.survivor_deaths,
-                    smu.clowns_honked as total_honks,
-                    smu.tanks_killed,
-                    smu.kills_witch,
-                    smu.ff_kills,
-                    smu.revived_others,
-                    smu.defibs_used,
-                    smu.finales_won,
-                    smu.pills_used,
-                    smu.adrenaline_used,
-                    -- Calculate special infected kills
-                    CAST((COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) +
-                     COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) +
-                     COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) AS UNSIGNED) as special_infected_kills,
-                    -- Calculate totals
-                    (smu.throws_molotov + smu.throws_pipe + smu.throws_puke) as total_throwables,
-                    (smu.pills_used + smu.adrenaline_used) as total_pills_shots,
-                    -- Session-specific fields
-                    FROM_UNIXTIME(smu.session_start) as session_start_formatted,
-                    FROM_UNIXTIME(smu.session_end) as session_end_formatted,
-                    CASE
+                    -- Aggregate stats across all sessions
+                    SUM(COALESCE(smu.common_kills, 0)) as common_kills,
+                    SUM(COALESCE(smu.melee_kills, 0)) as melee_kills,
+                    SUM(COALESCE(smu.survivor_damage_rec, 0)) as survivor_damage_rec,
+                    SUM(COALESCE(smu.survivor_ff, 0)) as survivor_ff,
+                    SUM(COALESCE(smu.survivor_ff_rec, 0)) as survivor_ff_rec,
+                    SUM(COALESCE(smu.throws_molotov, 0)) as throws_molotov,
+                    SUM(COALESCE(smu.throws_pipe, 0)) as throws_pipe,
+                    SUM(COALESCE(smu.throws_puke, 0)) as throws_puke,
+                    SUM(COALESCE(smu.heal_others, 0)) as heal_others,
+                    SUM(COALESCE(smu.survivor_incaps, 0)) as survivor_incaps,
+                    SUM(COALESCE(smu.survivor_deaths, 0)) as survivor_deaths,
+                    SUM(COALESCE(smu.clowns_honked, 0)) as total_honks,
+                    SUM(COALESCE(smu.tanks_killed, 0)) as tanks_killed,
+                    SUM(COALESCE(smu.kills_witch, 0)) as kills_witch,
+                    SUM(COALESCE(smu.ff_kills, 0)) as ff_kills,
+                    SUM(COALESCE(smu.revived_others, 0)) as revived_others,
+                    SUM(COALESCE(smu.defibs_used, 0)) as defibs_used,
+                    SUM(COALESCE(smu.finales_won, 0)) as finales_won,
+                    SUM(COALESCE(smu.pills_used, 0)) as pills_used,
+                    SUM(COALESCE(smu.adrenaline_used, 0)) as adrenaline_used,
+                    -- Calculate special infected kills (aggregated)
+                    SUM(COALESCE(smu.kills_boomer,0) + COALESCE(smu.kills_smoker,0) +
+                        COALESCE(smu.kills_jockey,0) + COALESCE(smu.kills_hunter,0) +
+                        COALESCE(smu.kills_spitter,0) + COALESCE(smu.kills_charger,0)) as special_infected_kills,
+                    -- Calculate totals (aggregated)
+                    SUM(COALESCE(smu.throws_molotov, 0) + COALESCE(smu.throws_pipe, 0) + COALESCE(smu.throws_puke, 0)) as total_throwables,
+                    SUM(COALESCE(smu.pills_used, 0) + COALESCE(smu.adrenaline_used, 0)) as total_pills_shots,
+                    -- Session-specific fields (use latest session)
+                    FROM_UNIXTIME(MAX(smu.session_start)) as session_start_formatted,
+                    FROM_UNIXTIME(MAX(smu.session_end)) as session_end_formatted,
+                    ROUND(SUM(CASE
                         WHEN smu.session_end > smu.session_start
-                        THEN ROUND((smu.session_end - smu.session_start) / 60, 1)
-                        ELSE NULL
-                    END as session_duration_minutes,
+                        THEN (smu.session_end - smu.session_start) / 60
+                        ELSE 0
+                    END), 1) as session_duration_minutes,
                     smu.mapid as map,
                     'Normal' as difficulty
                 FROM stats_map_users smu
                 WHERE smu.mapid = ?
-                ORDER BY smu.session_start DESC
+                GROUP BY smu.steamid, smu.mapid
+                ORDER BY MAX(smu.session_start) DESC
             `, [mapId]);
 
             // Calculate aggregated statistics

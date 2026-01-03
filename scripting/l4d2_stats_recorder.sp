@@ -1072,17 +1072,56 @@ void FlushQueuedStats(int client, bool disconnect) {
             			players[client].steamid
 			);
 		
+		// Also update map-specific stats in stats_map_users
+		char mapQuery[1200];
+		if(players[client].mapSessionStart > 0 && game.mapId[0]) {
+			Format(mapQuery, sizeof(mapQuery),
+				"UPDATE stats_map_users SET " ...
+				"survivor_damage_give=survivor_damage_give+%d,survivor_damage_rec=survivor_damage_rec+%d," ...
+				"infected_damage_give=infected_damage_give+%d,infected_damage_rec=infected_damage_rec+%d," ...
+				"common_kills=common_kills+%d,common_headshots=common_headshots+%d,melee_kills=melee_kills+%d," ...
+				"door_opens=door_opens+%d,damage_to_tank=damage_to_tank+%d,damage_witch=damage_witch+%d," ...
+				"minutes_played=minutes_played+%d,kills_witch=kills_witch+%d,packs_used=packs_used+%d," ...
+				"damage_molotov=damage_molotov+%d,kills_molotov=kills_molotov+%d,kills_pipe=kills_pipe+%d," ...
+				"kills_minigun=kills_minigun+%d,clowns_honked=clowns_honked+%d,total_distance_travelled=total_distance_travelled+%d " ...
+				"WHERE steamid='%s' AND mapid='%s'",
+				players[client].damageSurvivorGiven,
+				GetEntProp(client, Prop_Send, "m_checkpointDamageTaken"),
+				players[client].damageInfectedGiven,
+				players[client].damageInfectedRec,
+				GetEntProp(client, Prop_Send, "m_checkpointZombieKills"),
+				GetEntProp(client, Prop_Send, "m_checkpointHeadshots"),
+				GetEntProp(client, Prop_Send, "m_checkpointMeleeKills"),
+				players[client].doorOpens,
+				GetEntProp(client, Prop_Send, "m_checkpointDamageToTank"),
+				GetEntProp(client, Prop_Send, "m_checkpointDamageToWitch"),
+				minutes_played,
+				players[client].witchKills,
+				players[client].upgradePacksDeployed,
+				players[client].molotovDamage,
+				players[client].molotovKills,
+				players[client].pipeKills,
+				players[client].minigunKills,
+				players[client].clownsHonked,
+				players[client].distance.accumulation,
+				players[client].steamid,
+				game.mapId
+			);
+		}
+
 		//If disconnected, can't put on another thread for some reason: Push it out fast
-		PrintToServer("[l4d2_stats_recorder] Flushing stats for %N (SteamID: %s, Points: %d, Queue size: %d)", 
+		PrintToServer("[l4d2_stats_recorder] Flushing stats for %N (SteamID: %s, Points: %d, Queue size: %d)",
 			client, players[client].steamid, players[client].points, players[client].pointsQueue.Length);
-			
+
 		if(disconnect) {
 			SQL_LockDatabase(g_db);
 			SQL_FastQuery(g_db, query);
+			if(mapQuery[0]) SQL_FastQuery(g_db, mapQuery);
 			SQL_UnlockDatabase(g_db);
 			ResetInternal(client, true);
 		}else{
 			SQL_TQuery(g_db, DBCT_FlushQueuedStats, query, GetClientUserId(client));
+			if(mapQuery[0]) SQL_TQuery(g_db, DBCT_Generic, mapQuery, QUERY_UPDATE_STAT, DBPrio_Low);
 			SubmitPoints(client);
 			SubmitWeaponStats(client);
 			SubmitHeatmaps(client);
