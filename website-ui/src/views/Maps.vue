@@ -4,8 +4,9 @@
         <div class="hero-body">
             <div class="container has-text-centered">
             <h1 class="title">
-                Top Played Maps
+                Campaigns
             </h1>
+            <p class="subtitle">Sorted by most rated</p>
             </div>
         </div>
     </section>
@@ -15,47 +16,33 @@
         <div class="column">
             <div class="table-container">
                 <div class="table-wrapper">
-                    <b-table :loading="loading" @select="onMapSelect" :data="maps" :selected.sync="selected" @details-open="onDetailsOpen" @details-close="details = null" class="beautiful-table">
-                        <template slot-scope="props">
-                            <b-table-column width="20" >
-                                <router-link :to="getCampaignDetailLink(props.row.map_name)"><b-icon icon="angle-right" /></router-link>
-                            </b-table-column>
-                            <b-table-column field="map_name" label="Map" >
-                                <router-link :to="getCampaignDetailLink(props.row.map_name)">
-                                    <strong>{{ props.row.map_name | formatMap }}</strong>
-                                </router-link>
-                            </b-table-column>
-                            <b-table-column field="wins" label="Wins" centered>
-                                {{ props.row.wins | formatNumber }}
-                            </b-table-column>
-                            <b-table-column field="realism" label="Realism" centered>
-                                {{ props.row.realism | formatNumber }}
-                            </b-table-column>
-                            <b-table-column field="realism" label="Easy" centered>
-                                {{ props.row.difficulty_easy | formatNumber }}
-                            </b-table-column>
-                            <b-table-column field="realism" label="Normal" centered>
-                                {{ props.row.difficulty_normal | formatNumber }}
-                            </b-table-column>
-                            <b-table-column field="realism" label="Advanced" centered>
-                                {{ props.row.difficulty_advanced | formatNumber }}
-                            </b-table-column>
-                            <b-table-column field="realism" label="Expert" centered>
-                                {{ props.row.difficulty_expert | formatNumber }}
-                            </b-table-column>
-                        </template>
+                    <b-table
+                        :loading="loading"
+                        @click="onMapClick"
+                        :data="maps"
+                        :selected.sync="selected"
+                        class="beautiful-table"
+                        hoverable
+                    >
+                        <b-table-column field="map.name" label="Map" v-slot="props">
+                            <router-link :to="'/maps/' + props.row.map.id">
+                                <strong>{{ props.row.map.name }}</strong>
+                            </router-link>
+                        </b-table-column>
+                        <b-table-column field="chapterCount" label="Chapters" centered v-slot="props">
+                            {{ props.row.chapterCount }} chapters
+                        </b-table-column>
+                        <b-table-column field="uniquePlayers" label="Players" centered v-slot="props">
+                            {{ props.row.uniquePlayers | formatNumber }}
+                        </b-table-column>
+                        <b-table-column field="totalKills" label="Total Kills" centered v-slot="props">
+                            {{ props.row.totalKills | formatNumber }}
+                        </b-table-column>
+                        <b-table-column field="avgDuration" label="Avg Duration" centered v-slot="props">
+                            {{ props.row.avgDuration | formatDuration }}
+                        </b-table-column>
                     </b-table>
                 </div>
-            </div>
-        </div>
-        <div v-if="selected" class="column is-4">
-            <div class="box">
-                <router-link :to="getCampaignDetailLink(selected.map_name)">
-                <figure class="image is-4by5">
-                    <img :src="mapUrl" />
-                </figure>
-                 </router-link>
-                <b-button type="is-info" tag="router-link" size="is-large" expanded :to="getCampaignDetailLink(selected.map_name)">View</b-button>
             </div>
         </div>
       </div>
@@ -64,13 +51,10 @@
 </template>
 
 <script>
-import NoMapImage from '@/assets/no_map_image.png'
-import { getMapName, getMapImage} from '../js/map'
 export default {
     data() {
         return {
             maps: [],
-            details: null,
             selected: null,
             loading: true
         }
@@ -80,19 +64,13 @@ export default {
             this.loading = true;
             this.$http.get(`/api/maps`, { cache: true })
             .then(res => {
-                this.maps = res.data.maps;
-                if(this.$route.params.map) {
-                    const map = this.maps.find(v => v.map_name.toLowerCase() == this.$route.params.map.toLowerCase())
-                    if(map) {
-                        this.selected = map;
-                    }
-                }
+                this.maps = res.data;
             })
             .catch(err => {
                 console.error('Fetch error', err)
                 this.$buefy.snackbar.open({
                     duration: 5000,
-                    message: 'Error ocurred while fetching maps',
+                    message: 'Error occurred while fetching maps',
                     type: 'is-danger',
                     position: 'is-bottom-left',
                     actionText: 'Retry',
@@ -100,40 +78,26 @@ export default {
                 })
             }).finally(() => this.loading = false)
         },
-        onDetailsOpen(obj) {
-            this.details = obj;
-        },
-        onMapSelect() {
-            //this.$router.replace(`/maps/${sel.map_name}`)
-        },
-        getCampaignDetailLink(mapName) {
-            const id = getMapName(mapName).toLowerCase().replace(/\s/, '-');
-            return `/maps/${id}/details`
-        }
-    },
-    watch: {
-        '$route.params.map': function (oldv) {
-            if(!oldv) {
-                this.selected = null;
-            }
-        }
-    },
-    computed: {
-        mapUrl() {
-            if(this.selected) {
-                const imageUrl = getMapImage(this.selected.map_name);
-                return imageUrl ? `/img/posters/${imageUrl}` : NoMapImage;
-            }
-            return NoMapImage
+        onMapClick(row) {
+            this.$router.push('/maps/' + row.map.id)
         }
     },
     mounted() {
         this.fetchMaps();
     },
     filters: {
-        formatMap(str) {
-            return getMapName(str)
+        formatNumber(num) {
+            if (num === null || num === undefined) return '0';
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         },
+        formatDuration(minutes) {
+            if (!minutes) return 'minutes';
+            const mins = parseFloat(minutes);
+            if (mins < 60) return `${mins.toFixed(4)} minutes`;
+            const hours = Math.floor(mins / 60);
+            const remainingMins = Math.round(mins % 60);
+            return `${hours}h ${remainingMins}m`;
+        }
     }
 }
 </script>
@@ -207,6 +171,7 @@ export default {
 .beautiful-table .table tbody tr {
     transition: all 0.3s ease !important;
     border-bottom: 1px solid #f5f5f5 !important;
+    cursor: pointer;
 }
 
 .beautiful-table .table tbody tr:hover {
@@ -236,16 +201,6 @@ export default {
     font-size: 0.9rem !important;
 }
 
-.beautiful-table .button.is-info {
-    background: #167df0 !important;
-    border: none !important;
-    color: white !important;
-}
-
-.beautiful-table .button.is-info:hover {
-    background: #1366d6 !important;
-}
-
 /* Map link styling */
 .beautiful-table .table td a {
     color: #167df0 !important;
@@ -255,14 +210,6 @@ export default {
 }
 
 .beautiful-table .table td a:hover {
-    color: #1366d6 !important;
-}
-
-.beautiful-table .table td .icon {
-    color: #167df0 !important;
-}
-
-.beautiful-table .table td .icon:hover {
     color: #1366d6 !important;
 }
 </style>
